@@ -62,7 +62,7 @@ ggplot()+
 ggsave(file.path("01_Data","Output","Figures","Age-LengthKey.png"),
        width = 6, height = 4, units = "in", dpi = 300)
 
-x_new <- rep(seq(1,8, by = 1), 100)
+x_new <- rep(seq(1,8, by = 1), 10000)
 
 alk.lm$fitted.values <- predict(alk.lm, data.frame(x = x_new))
 
@@ -75,7 +75,7 @@ y_new <- simulate(alk.lm)[,1]
  lines(c(1,unique(stb.age$Age)), predicted.intervals[,4], col = 'black', lwd = 1, lty = 2)
 
 alk_new <- tibble(Age = x_new, Length_cm = y_new) %>%
-  mutate()
+  mutate(Length_cm = ifelse(Length_cm < 0,0,Length_cm))
 
 # Find the minimum size for use in lencat function
 FSA::Summarize(~Length_cm, data = alk_new, digits = 1)
