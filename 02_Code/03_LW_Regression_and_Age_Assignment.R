@@ -10,7 +10,7 @@ LW_log <- lm(log(weight_g) ~ log(fork_length_mm), data = LWdata)
 xx <- min(LWdata$fork_length_mm, na.rm = T):max(LWdata$fork_length_mm, na.rm = T)
 
 pred_log <- data.frame(predict(LW_log, newdata = data.frame("fork_length_mm" = xx), 
-                 interval = "prediction")) %>%
+                 interval = "confidence")) %>%
   bind_cols(xx)
 names(pred_log) <- c("fit","lwr","upr","fork_length_mm")
 
@@ -23,7 +23,7 @@ LW_nls <- nls(weight_g ~ a * fork_length_mm^b,
 pred_nls <- xgxr::predict.nls(LW_nls,
                               newdata = data.frame("fork_length_mm" = xx), 
                               se.fit = TRUE, interval = "confidence", 
-                              level = 0.995)$fit %>%
+                              level = 0.95)$fit %>%
   bind_cols(xx)
 names(pred_nls) <- c("fit","lwr","upr","fork_length_mm")
 
