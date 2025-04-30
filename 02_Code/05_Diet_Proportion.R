@@ -26,9 +26,9 @@ for(j in 2:length(qpcrT)){
     FOm[j] <- -Inf
   }
   StPs[j] <- qpcrT[j] / qpcrT[1]
-  FObtlw[j] <- ilogit(FOm[j] - 1.96 * FOse[j])
-  FObtup[j] <- ilogit(FOm[j] + 1.96 * FOse[j])
-  FObtm[j] <- ilogit(FOm[j])
+  FObtlw[j] <- boot::inv.logit(FOm[j] - 1.96 * FOse[j])
+  FObtup[j] <- boot::inv.logit(FOm[j] + 1.96 * FOse[j])
+  FObtm[j] <- boot::inv.logit(FOm[j])
 }
 
 # diet fractions for the fixed analyses
@@ -61,7 +61,7 @@ for(i in 1:nperm){
   pWdi <- rnorm(14, histPdiet$percWTmean, histPdiet$percWTsd)
   pWdi[which(pWdi < 0)] <- 0
   pWdi[which(pWdi > 1)] <- 1
-  pFOdi <- c(ilogit(rnorm(11, as.numeric(FOm[2:12]), 
+  pFOdi <- c(boot::inv.logit(rnorm(11, as.numeric(FOm[2:12]), 
                           as.numeric(FOse[2:12]))), 
              rnorm(3, histFOdiet$FOmean, histFOdiet$FOsd)) 
   pFOdi[which(pFOdi < 0)] <- 0
@@ -77,3 +77,6 @@ sd(dietfVA[, "CHN"])
 
 dietfVCHN <- dietfVA[, "CHN"]
 rm("dietfVA")
+
+saveRDS(dietf, file.path("01_Data","Input","diet_fraction.rds"))
+saveRDS(dietfVCHN, file.path("01_Data","Input","diet_fraction_variable_analysis.rds"))
