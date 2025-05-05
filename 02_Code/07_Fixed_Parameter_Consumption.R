@@ -3,9 +3,14 @@
 # 3. Fixed Parameter Calculations
 #
 ################################################################################
+library(tidyverse)
+library(lubridate)
 
 LWdataA <- readRDS(file.path("01_Data","Output","LWdataA.rds"))
 dietf <- readRDS(file.path("01_Data","Input","diet_fraction.rds"))
+TeT <- readRDS(file.path("01_Data","Input","temps.rds")) %>%
+  group_by(WaterYear, Date) %>%
+  summarize(Temp = mean(Value, na.rm = TRUE))
 # set up parameters based on age classes
 
 cparams <- data.frame(
@@ -57,18 +62,17 @@ for(i in 1:nrow(LWdataA)){
 }
 
 
-TotalBasicDirectOutput_plt1 <- data.frame(Date, gramsCHNconsumed = 
+TotalBasicDirectOutput_plt1 <- data.frame(TeT$Date, gramsCHNconsumed = 
                                             round(apply(TCHNconsmat_plt1, 2, sum), 3))
 write.csv(TotalBasicDirectOutput_plt1, 
-          file.path("01_Data","Output","TotalBasicDirectCHNConsumption_plt1.csv"), 
+          file.path("01_Data","Output","Tables", "TotalBasicDirectCHNConsumption_plt1.csv"), 
           row.names = F)
 
 TotalFullBasicDirectOutput_plt1 <- data.frame(round(TCHNconsmat_plt1, 4))
-colnames(TotalFullBasicDirectOutput_plt1) <- TeT$date
+colnames(TotalFullBasicDirectOutput_plt1) <- TeT$Date
 write.csv(TotalFullBasicDirectOutput_plt1, 
-          file.path("01_Data","Output","TotalFullBasicDirectCHNConsumption_plt1.csv"), 
+          file.path("01_Data","Output","Tables","TotalFullBasicDirectCHNConsumption_plt1.csv"), 
           row.names = F)
-
 
 CHNconsmat_plt1 <- TCHNconsmat_plt1
 
@@ -80,16 +84,16 @@ for(i in 1:nrow(LWdataA)){
 
 
 
-BasicDirectOutput_plt1 <- data.frame(Date, gramsCHNconsumed = 
+BasicDirectOutput_plt1 <- data.frame(TeT$Date, gramsCHNconsumed = 
                                        round(apply(CHNconsmat_plt1, 2, sum), 3))
 write.csv(BasicDirectOutput_plt1, 
-          file.path("01_Data","Output","BasicDirectCHNConsumption_plt1.csv"), 
+          file.path("01_Data","Output","Tables","BasicDirectCHNConsumption_plt1.csv"), 
           row.names = F)
 
 FullBasicDirectOutput_plt1 <- data.frame(round(CHNconsmat_plt1, 4))
-colnames(FullBasicDirectOutput_plt1) <- TeT$date
+colnames(FullBasicDirectOutput_plt1) <- TeT$Date
 write.csv(FullBasicDirectOutput_plt1, 
-          file.path("01_Data","Output","FullBasicDirectCHNConsumption_plt1.csv"), 
+          file.path("01_Data","Output","Tables","FullBasicDirectCHNConsumption_plt1.csv"), 
           row.names = F)
 
 # Basic Consumption, p = 1.0
@@ -131,18 +135,17 @@ for(i in 1:nrow(LWdataA)){
 }
 
 
-TotalBasicDirectOutput_p1 <- data.frame(Date, gramsCHNconsumed = 
+TotalBasicDirectOutput_p1 <- data.frame(TeT$Date, gramsCHNconsumed = 
                                           round(apply(TCHNconsmat_p1, 2, sum), 3))
 write.csv(TotalBasicDirectOutput_p1, 
-          file.path("01_Data","Output","TotalBasicDirectCHNConsumption_p1.csv"), 
+          file.path("01_Data","Output","Tables","TotalBasicDirectCHNConsumption_p1.csv"), 
           row.names = F)
 
 TotalFullBasicDirectOutput_p1 <- data.frame(round(TCHNconsmat_p1, 4))
-colnames(TotalFullBasicDirectOutput_p1) <- Date
+colnames(TotalFullBasicDirectOutput_p1) <- TeT$Date
 write.csv(TotalFullBasicDirectOutput_p1, 
-          file.path("01_Data","Output","TotalFullBasicDirectCHNConsumption_p1.csv"), 
+          file.path("01_Data","Output","Tables","TotalFullBasicDirectCHNConsumption_p1.csv"), 
           row.names = F)
-
 
 CHNconsmat_p1 <- TCHNconsmat_p1
 
@@ -152,16 +155,14 @@ for(i in 1:nrow(LWdataA)){
   CHNconsmat_p1[i, ZDs] <- 0   
 }
 
-
-
-BasicDirectOutput_p1 <- data.frame(Date, gramsCHNconsumed = 
+BasicDirectOutput_p1 <- data.frame(TeT$Date, gramsCHNconsumed = 
                                      round(apply(CHNconsmat_p1, 2, sum), 3))
 write.csv(BasicDirectOutput_p1, 
-          "Output/BasicDirectCHNConsumption_p1.csv", 
+          file.path("01_Data","Output","Tables","BasicDirectCHNConsumption_p1.csv"), 
           row.names = F)
 
 FullBasicDirectOutput_p1 <- data.frame(round(CHNconsmat_p1, 4))
-colnames(FullBasicDirectOutput_p1) <- Date
+colnames(FullBasicDirectOutput_p1) <- TeT$Date
 write.csv(FullBasicDirectOutput_p1, 
-          "Output/FullBasicDirectCHNConsumption_p1.csv", 
+          file.path("01_Data","Output","Tables","FullBasicDirectCHNConsumption_p1.csv"), 
           row.names = F)

@@ -1,4 +1,14 @@
-# consumption functions with variation
+# for consumption: digitized data for cmax, 
+# digitized data for temperature dependence
+
+CmaxW <- read.csv(file.path("01_Data","Input","CmaxWt.csv"))
+CtempA1 <- read.csv(file.path("01_Data","Input","CtempA1.csv"))
+CtempA2 <- read.csv(file.path("01_Data","Input","CtempA2.csv"))
+CtempA3 <- read.csv(file.path("01_Data","Input","CtempA3.csv"))
+
+source(file.path("02_Code","Functions.R"))
+
+#consumption functions with variation
 
 # refit the Cmax allometric relationship
 ConAllo_log <- lm(log(Cmax) ~ log(Wt), data = CmaxW)
@@ -37,14 +47,15 @@ ggplot()+
   theme_classic()+
   labs(x = "Wet Weight (g)", y = "Cmax (g/g/d)")
 
-savePlot("Output/Cmax.tiff", type="tiff")
+ggsave(file.path("01_Data","Output", "Figures", "Cmax.png"), device = "png", width = 6,
+       height = 4, units = "in", dpi = 300)
 
 # refit the age-specific temperature dependence relationships
 #   because gam predict only gives the error of the fit, we expand the 
 #   error to include residuals (to generate prediction interval)
 
 # age 1 (100 g)
-g1 <- gam(C ~ s(Temp), data = CtempA1)
+g1 <- mgcv::gam(C ~ s(Temp), data = CtempA1)
 summary(g1)
 xp <- seq(6, 30, 0.1)
 gpy <- predict(g1, newdata = list(Temp = xp), type = 'response', 
@@ -69,11 +80,13 @@ ggplot()+
   geom_line(data = yp, aes(x = Temp, y = `...1`),
             color = "blue", linetype = "dashed")+
   theme_classic()
-savePlot("Output/CTa1.tiff", type = "tiff")
+
+ggsave(file.path("01_Data","Output", "Figures", "CT_age_1.png"), device = "png", width = 6,
+       height = 4, units = "in", dpi = 300)
 
 # age 2 (350 g)
 
-g2 <- gam(C ~ s(Temp), data = CtempA2)
+g2 <- mgcv::gam(C ~ s(Temp), data = CtempA2)
 summary(g2)
 xp <- seq(6, 30, 0.1)
 gpy <- predict(g2, newdata = list(Temp = xp), type = 'response', 
@@ -97,10 +110,12 @@ ggplot()+
   geom_line(data = yp, aes(x = Temp, y = `...1`),
             color = "blue", linetype = "dashed")+
   theme_classic()
-savePlot("Output/CTa2.tiff", type = "tiff")
+
+ggsave(file.path("01_Data","Output", "Figures", "CT_age_2.png"), device = "png", width = 6,
+       height = 4, units = "in", dpi = 300)
 
 # age 3 (1000 g)
-g3 <- gam(C ~ s(Temp), data = CtempA3)
+g3 <- mgcv::gam(C ~ s(Temp), data = CtempA3)
 summary(g3)
 xp <- seq(6, 30, 0.1)
 gpy <- predict(g3, newdata = list(Temp = xp), type = 'response', 
@@ -124,4 +139,6 @@ ggplot()+
   geom_line(data = yp, aes(x = Temp, y = `...1`),
             color = "blue", linetype = "dashed")+
   theme_classic()
-savePlot("Output/CTa3.tiff", type = "tiff")
+
+ggsave(file.path("01_Data","Output", "Figures", "CT_age_3.png"), device = "png", width = 6,
+       height = 4, units = "in", dpi = 300)
