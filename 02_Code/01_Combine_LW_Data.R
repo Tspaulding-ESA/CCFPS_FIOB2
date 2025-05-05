@@ -141,7 +141,7 @@ catch_comb_comp = catch_comb %>%
 ggplot(catch_comb_comp, aes(x = gear, y = fork_length_mm, fill = in_lw)) +
   geom_boxplot(alpha = 0.4)
 
-
+write.csv(catch_comb, file.path("01_Data","Input","SBlw.csv"))
 
 
 # # below this point I was exploring the idea that the shorter fork lengths were driving 

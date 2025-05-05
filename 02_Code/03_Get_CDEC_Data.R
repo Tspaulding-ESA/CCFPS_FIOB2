@@ -1,6 +1,7 @@
 library(cder)
 library(dplyr)
 library(lubridate)
+#devtools::install_github("https://github.com/EnvironmentalScienceAssociates/esaRmisc")
 library(esaRmisc)
 
 clc_temp_raw = cdec_query("CLC", sensors = 146, durations = "H",
@@ -15,3 +16,5 @@ clc_temp = clc_temp_raw %>%
          across(c(Time, Time_UTC), ~ ifelse(.x == "", "00:00:00", .x))) %>% 
   filter(WaterYear > 2014 & WaterYear < 2024) %>% 
   select(WaterYear, Date, DateTime, DateTime_UTC, Time, Time_UTC, Value, SensorUnits)
+
+saveRDS(clc_temp, file.path("01_Data","Input","temps.rds"))
