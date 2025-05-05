@@ -1,3 +1,9 @@
+# for predator diet: historic qpcr data, historic % data, historic FO data
+
+qpcr <- read.csv(file.path("01_Data","Input","QPCR.csv"))
+histPdiet <- read.csv(file.path("01_Data","Input","HistoricDiet.csv"))
+histFOdiet <- read.csv(file.path("01_Data","Input","HistoricFODiet.csv"))
+
 # predator diet frequency of occurrence
 
 # integrate the qpcr data through time
