@@ -16,33 +16,6 @@ pred_log <- data.frame(predict(LW_log, newdata = data.frame("fork_length_mm" = x
   bind_cols(xx)
 names(pred_log) <- c("fit","lwr","upr","fork_length_mm")
 
-# Fit the model using nls
-LW_nls <- nls(weight_g ~ a * fork_length_mm^b, 
-             data = na.omit(LWdata), 
-             start = list(a = 3.28e-5,
-                          b = 2.85)) # using starting values from Juniper's Code
-
-pred_nls <- xgxr::predict.nls(LW_nls,
-                              newdata = data.frame("fork_length_mm" = xx), 
-                              se.fit = TRUE, interval = "confidence", 
-                              level = 0.95)$fit %>%
-  bind_cols(xx)
-names(pred_nls) <- c("fit","lwr","upr","fork_length_mm")
-
-# Plot
-ggplot()+
-  geom_point(data = LWdata, aes(x = fork_length_mm, y = weight_g),
-             shape = 21, fill = NA, color = "grey20")+
-  geom_line(data = pred_log, aes(x = fork_length_mm, y =exp(fit)),
-            color = "blue")+
-  geom_ribbon(data = pred_log, aes(x = fork_length_mm, ymin = exp(lwr), ymax = exp(upr)),
-              fill = "blue",alpha = 0.05)+
-  geom_line(data = pred_nls, aes(x = fork_length_mm, y = fit),
-            color = "tomato")+
-  geom_ribbon(data = pred_nls, aes(x = fork_length_mm, ymin = lwr, ymax = upr),
-              fill = "tomato",alpha = 0.1, inherit.aes = FALSE)+
-  theme_classic()
-
 # predator sizes and age classes
 
 # for the few removed predators that don't have lengths, we assume the 
@@ -61,14 +34,41 @@ for(i in 1:length(tofillin)){
 
 # for any predators that don't have weights, we use the nls regession
 
- pred_wt <- xgxr::predict.nls(LW_nls, 
-                              newdata = data.frame("fork_length_mm" = LWdataA$fork_length_mm), 
-                              interval = "none")
+# Fit all fish to new weights using NLS
+LW_nls <- nls(weight_g ~ a * fork_length_mm^b, 
+              data = LWdataA, 
+              start = list(a = 3.28e-5,
+                           b = 2.85))
 
- LWdataA <- LWdataA %>%
-   bind_cols(data.frame("pred_wt" = pred_wt)) %>%
-   mutate(weight_g = round(ifelse(is.na(weight_g), pred_wt, weight_g),0))
- 
+# Then, bootstrap and simulate the data to create a prediction interval
+pred_wt_bt <- nlraa::boot_nls(LW_nls, fitted) ## This takes about 7s
+pred_wt_bt_pred <- nlraa::summary_simulate(t(pred_wt_bt$t))
+
+pred_wt <- data.frame(method = "nls-bootstrap", 
+                             "fork_length_mm" = LWdataA$fork_length_mm, 
+                             fit = pred_wt_bt_pred[,1], 
+                             lwr = pred_wt_bt_pred[,3],
+                             upr = pred_wt_bt_pred[,4])
+
+LWdataA <- LWdataA %>%
+  bind_cols(select(pred_wt,-fork_length_mm)) %>%
+  mutate(weight_g = round(ifelse(is.na(weight_g), fit, weight_g),0))
+
+# Plot
+ggplot()+
+  geom_point(data = LWdata, aes(x = fork_length_mm, y = weight_g),
+             shape = 21, fill = NA, color = "grey20")+
+  geom_line(data = pred_log, aes(x = fork_length_mm, y =exp(fit)),
+            color = "blue")+
+  geom_ribbon(data = pred_log, aes(x = fork_length_mm, ymin = exp(lwr), ymax = exp(upr)),
+              fill = "blue",alpha = 0.05)+
+  geom_line(data = pred_wt, aes(x = fork_length_mm, y = fit),
+            color = "tomato")+
+  geom_ribbon(data = pred_wt, aes(x = fork_length_mm, ymin = lwr, ymax = upr),
+              fill = "tomato",alpha = 0.1, inherit.aes = FALSE)+
+  theme_classic()
+
+
 # determine the age class of each individual sampled
 
 #source(file.path("2. Code","Age_Analysis.R"))
