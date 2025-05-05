@@ -1,5 +1,7 @@
+library(tidyverse)
+
 # predator l-w regression
-LWdata <- read.csv("01_Data","Input","SBlw.csv")
+LWdata <- read.csv(file.path("01_Data","Input","SBlw.csv"))
 
 # fit the regression 	
 LWdata <- LWdata %>%
@@ -10,7 +12,7 @@ LW_log <- lm(log(weight_g) ~ log(fork_length_mm), data = LWdata)
 xx <- min(LWdata$fork_length_mm, na.rm = T):max(LWdata$fork_length_mm, na.rm = T)
 
 pred_log <- data.frame(predict(LW_log, newdata = data.frame("fork_length_mm" = xx), 
-                 interval = "confidence")) %>%
+                 interval = "prediction")) %>%
   bind_cols(xx)
 names(pred_log) <- c("fit","lwr","upr","fork_length_mm")
 
