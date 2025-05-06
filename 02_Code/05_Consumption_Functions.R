@@ -157,7 +157,7 @@ ggsave(file.path("01_Data","Output", "Figures", "CT_age_3.png"), device = "png",
 saveRDS(g1, file.path("01_Data","Input","g1.rds"))
 saveRDS(g2, file.path("01_Data","Input","g2.rds"))
 saveRDS(g3, file.path("01_Data","Input","g3.rds"))
-
+gs <- list(g1, g2, g3, g3, g3, g3, g3, g3, g3, g3)
 # Build Lookup Tables for faster processing
 # Predicted Cmax based on Age and Temp
 pred_cmax_lu <- list()
@@ -168,8 +168,12 @@ for (i in 1:length(gs)){
               "TE" = TE)
 }
 pred_cmax_lu <- bind_rows(pred_cmax_lu) %>%
-  distinct()
-names(pred_cmax_lu) <- c("cmax_mean", "cmax_se.fit", "age", "TE")
+  mutate(TE = round(TE,2)) %>%
+  group_by(age, TE) %>%
+  summarise(fit = mean(fit),
+            se.fit = mean(se.fit))
+
+names(pred_cmax_lu) <- c("age", "TE","cmax_mean", "cmax_se.fit")
 saveRDS(pred_cmax_lu, file.path("01_Data","Input","pred_cmax_lu.rds"))
 
 # Residuals of the Predicted Cmax relationship
