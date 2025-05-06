@@ -111,3 +111,5 @@ for(y in unique(LWdataA$wy)){
   TCHNconsmatVA[[y]] <- fish_list 
 }
 stopCluster(cl = cluster)
+
+saveRDS(TCHNconsmatVA,file.path("01_Data","Output","Tables","TCHNconsmatVA.rds"))
