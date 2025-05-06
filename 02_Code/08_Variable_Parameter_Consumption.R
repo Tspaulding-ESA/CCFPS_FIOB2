@@ -19,6 +19,7 @@ library(foreach)
 library(parallel)
 library(doSNOW)
 library(progress)
+library(lubridate)
 set.seed(123)
 
 # Bring in the Data
@@ -77,7 +78,7 @@ for(y in unique(LWdataA$cap_wy)){
   foreach(f = 1:nrow(LWdataA_y), .options.snow = opts) %dopar% {
     
     #Subset the temperature data for 70 weeks post-capture
-    TE <- TeT_y[TeT_y$Date <= (ymd(LWdataA_y[f,]$cap_date) + 490),]$Temp
+    TE <- TeT_y[TeT_y$Date <= (lubridate::ymd(LWdataA_y[f,]$cap_date) + 490),]$Temp
     
     LWdata_f <- LWdataA_y[f,] |>
       dplyr::mutate(WW = list(round(rnorm(NPERM,  fit, 
@@ -107,9 +108,9 @@ for(y in unique(LWdataA$cap_wy)){
                     TCHN_cons_p1 = ifelse(TCHN_cons_p1 < 0, 0, TCHN_cons_p1),
                     # if the date is <= date of capture, set consumption to 0 as well
                     TCHN_cons_plt1 = ifelse(Date <= cap_date, NA, TCHN_cons_plt1),
-                    TCHN_cons_p1 = ifelse(Date <= cap_date, NA, TCHN_cons_p1)) %>%
-      group_by(X, species, survey, gear, cap_wy, cap_date, fork_length_mm, weight_g) %>%
-      summarize(plt1_mean = mean(TCHN_cons_plt1, na.rm = TRUE),
+                    TCHN_cons_p1 = ifelse(Date <= cap_date, NA, TCHN_cons_p1)) |>
+      dplyr::group_by(X, species, survey, gear, cap_wy, cap_date, fork_length_mm, weight_g) |>
+      dplyr::summarize(plt1_mean = mean(TCHN_cons_plt1, na.rm = TRUE),
                 plt1_lwr = quantile(TCHN_cons_plt1, 0.05, na.rm = TRUE),
                 plt1_upr = quantile(TCHN_cons_plt1, 0.05, na.rm = TRUE),
                 p1_mean = mean(TCHN_cons_p1, na.rm = TRUE),
