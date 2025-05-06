@@ -43,7 +43,7 @@ pvals <- c(rep(0.69, 2), rep(0.73, 1), rep(0.68, 1), rep(0.62, 6))
 NPERM <- 100
 
 LWdataA <- LWdataA %>%
-  mutate(wy = esaRmisc::water_year(date)) %>%
+  mutate(cap_wy = esaRmisc::water_year(date)) %>%
   rename("cap_date" = date)
 
 # Setup the parallel processing
@@ -53,11 +53,10 @@ cl <- makeCluster(n_cores - 2)
 doSNOW::registerDoSNOW(cl)
 
 TCHNconsmatVA <-list()
-for(y in unique(LWdataA$wy)){
-  LWdataA_y <- LWdataA[LWdataA[["wy"]] == y,]
-  TeT_y <- TeT[TeT[["WaterYear"]] == y,]
+for(y in unique(LWdataA$cap_wy)){
+  LWdataA_y <- LWdataA[LWdataA[["cap_wy"]] == y,]
+  TeT_y <- TeT[TeT[["WaterYear"]] %in% c(y,y+1),]
   
-  TE <- TeT_y$Temp
   print(y)
   
   # Progress Bar
@@ -76,6 +75,10 @@ for(y in unique(LWdataA$wy)){
   
   fish_list <- list()
   foreach(f = 1:nrow(LWdataA_y), .options.snow = opts) %dopar% {
+    
+    #Subset the temperature data for 70 weeks post-capture
+    TE <- TeT_y[TeT_y$Date <= (ymd(LWdataA_y[f,]$cap_date) + 490),]$Temp
+    
     LWdata_f <- LWdataA_y[f,] |>
       dplyr::mutate(WW = list(round(rnorm(NPERM,  fit, 
                                    (fit - lwr) / 1.96),2))) |>
@@ -105,7 +108,7 @@ for(y in unique(LWdataA$wy)){
                     # if the date is <= date of capture, set consumption to 0 as well
                     TCHN_cons_plt1 = ifelse(Date <= cap_date, NA, TCHN_cons_plt1),
                     TCHN_cons_p1 = ifelse(Date <= cap_date, NA, TCHN_cons_p1)) %>%
-      group_by(X, species, survey, gear, cap_date, fork_length_mm, weight_g) %>%
+      group_by(X, species, survey, gear, cap_wy, cap_date, fork_length_mm, weight_g) %>%
       summarize(plt1_mean = mean(TCHN_cons_plt1, na.rm = TRUE),
                 plt1_lwr = quantile(TCHN_cons_plt1, 0.05, na.rm = TRUE),
                 plt1_upr = quantile(TCHN_cons_plt1, 0.05, na.rm = TRUE),
@@ -118,6 +121,6 @@ for(y in unique(LWdataA$wy)){
   }
   TCHNconsmatVA[[y]] <- fish_list 
 }
-stopCluster(cl = cluster)
+stopCluster(cl = cl)
 
 saveRDS(TCHNconsmatVA,file.path("01_Data","Output","Tables","TCHNconsmatVA.rds"))
