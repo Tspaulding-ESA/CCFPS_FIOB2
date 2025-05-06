@@ -43,7 +43,8 @@ pvals <- c(rep(0.69, 2), rep(0.73, 1), rep(0.68, 1), rep(0.62, 6))
 NPERM <- 100
 
 LWdataA <- LWdataA %>%
-  mutate(wy = esaRmisc::water_year(date))
+  mutate(wy = esaRmisc::water_year(date)) %>%
+  rename("cap_date" = date)
 
 # Setup the parallel processing
 # Cores
@@ -102,8 +103,15 @@ for(y in unique(LWdataA$wy)){
       dplyr::mutate(TCHN_cons_plt1 = ifelse(TCHN_cons_plt1 < 0, 0, TCHN_cons_plt1),
                     TCHN_cons_p1 = ifelse(TCHN_cons_p1 < 0, 0, TCHN_cons_p1),
                     # if the date is <= date of capture, set consumption to 0 as well
-                    TCHN_cons_plt1 = ifelse(Date <= date, 0, TCHN_cons_plt1),
-                    TCHN_cons_p1 = ifelse(Date <= date, 0, TCHN_cons_p1))
+                    TCHN_cons_plt1 = ifelse(Date <= cap_date, NA, TCHN_cons_plt1),
+                    TCHN_cons_p1 = ifelse(Date <= cap_date, NA, TCHN_cons_p1)) %>%
+      group_by(X, species, survey, gear, cap_date, fork_length_mm, weight_g) %>%
+      summarize(plt1_mean = mean(TCHN_cons_plt1, na.rm = TRUE),
+                plt1_lwr = quantile(TCHN_cons_plt1, 0.05, na.rm = TRUE),
+                plt1_upr = quantile(TCHN_cons_plt1, 0.05, na.rm = TRUE),
+                p1_mean = mean(TCHN_cons_p1, na.rm = TRUE),
+                p1_lwr = quantile(TCHN_cons_p1, 0.05, na.rm = TRUE),
+                p1_upr = quantile(TCHN_cons_p1, 0.05, na.rm = TRUE))
     
     
     fish_list[[f]] <- LWdata_f
