@@ -19,7 +19,6 @@ library(foreach)
 library(parallel)
 library(doSNOW)
 library(progress)
-library(lubridate)
 set.seed(123)
 
 # Bring in the Data
@@ -87,36 +86,51 @@ for(y in unique(LWdataA$cap_wy)){
       tidyr::unnest(WW) |>
       dplyr::mutate(WW = round(WW,3)) |>
       dplyr::rename("TE" = Temp) |>
+      dplyr::mutate(TE = round(TE,2)) |>
       dplyr::left_join(pred_cmax_lu) |>
       dplyr::mutate(cmax_sds = cmax_se.fit/r_sq_lu[age][[1]]) |>
       dplyr::left_join(ref_cmax_lu) |>
-      dplyr::left_join(con_allo_lu) |>
-      dplyr::mutate(TCHN_cons_plt1 = rnorm(NPERM, cmax_mean, cmax_sds) / 
-                      rnorm(NPERM, ref_cmax_mean,ref_cmax_sds) * 
-                      rnorm(NPERM, cmaxi_mean, cmaxi_sds) * 
-                      WW * pvals[age] *
-                      sample(dietfVCHN, NPERM, replace = T),
-                    TCHN_cons_p1 = rnorm(NPERM, cmax_mean, cmax_sds) / 
-                      rnorm(NPERM, ref_cmax_mean,ref_cmax_sds) * 
-                      rnorm(NPERM, cmaxi_mean, cmaxi_sds) * 
-                      WW * 1 * #pval == 1
-                      sample(dietfVCHN, NPERM, replace = T))
+      dplyr::left_join(con_allo_lu)
     
+    # Calculating the variation in consumption requires calculation by row
+    tmp_list <- list()
+    for(i in 1:nrow(LWdata_f)){
+      tmp <- LWdata_f[i,]
+      TCHN_cons_plt1 = rnorm(NPERM, tmp$cmax_mean, tmp$cmax_sds) / 
+        rnorm(NPERM, tmp$ref_cmax_mean,tmp$ref_cmax_sds) * 
+        rnorm(NPERM, tmp$cmaxi_mean, tmp$cmaxi_sds) * 
+        tmp$WW * pvals[tmp$age] * #pva; based on age
+        sample(dietfVCHN, NPERM, replace = T)
+      TCHN_cons_p1 = rnorm(NPERM, tmp$cmax_mean, tmp$cmax_sds) / 
+        rnorm(NPERM, tmp$ref_cmax_mean,tmp$ref_cmax_sds) * 
+        rnorm(NPERM, tmp$cmaxi_mean, tmp$cmaxi_sds) * 
+        tmp$WW * 1 * #pval == 1
+        sample(dietfVCHN, NPERM, replace = T)
+      tmp <- bind_cols(tmp, "TCHN_cons_p1" = TCHN_cons_p1, "TCHN_cons_plt1" = TCHN_cons_plt1)
+      tmp_list[[i]] <- tmp
+    }
+    # rejoin everything back together
+    LWdata_f <- bind_rows(tmp_list)
+    #rm(tmp_list)
+    
+    # Continue
     LWdata_f <- LWdata_f |>
       #If the predicted value is below 0, fix to 0
       dplyr::mutate(TCHN_cons_plt1 = ifelse(TCHN_cons_plt1 < 0, 0, TCHN_cons_plt1),
-                    TCHN_cons_p1 = ifelse(TCHN_cons_p1 < 0, 0, TCHN_cons_p1),
-                    # if the date is <= date of capture, set consumption to 0 as well
-                    TCHN_cons_plt1 = ifelse(Date <= cap_date, NA, TCHN_cons_plt1),
-                    TCHN_cons_p1 = ifelse(Date <= cap_date, NA, TCHN_cons_p1)) |>
-      dplyr::group_by(X, species, survey, gear, cap_wy, cap_date, fork_length_mm, weight_g) |>
+                    TCHN_cons_p1 = ifelse(TCHN_cons_p1 < 0, 0, TCHN_cons_p1))|>
+      # if the date is <= date of capture, set consumption to 0 as well
+      dplyr::mutate(TCHN_cons_plt1 = ifelse(Date <= lubridate::ymd(cap_date), NA, TCHN_cons_plt1),
+                    TCHN_cons_p1 = ifelse(Date <= lubridate::ymd(cap_date), NA, TCHN_cons_p1)) |>
+      filter(!is.na(TCHN_cons_p1)) |>
+      ungroup() |>
+      #Summarise by finding the mean, upper, and lower consumption values for each date for each fish
+      dplyr::group_by(X, species, survey, gear, cap_wy, cap_date, fork_length_mm, age, Date) |>
       dplyr::summarize(plt1_mean = mean(TCHN_cons_plt1, na.rm = TRUE),
-                plt1_lwr = quantile(TCHN_cons_plt1, 0.05, na.rm = TRUE),
-                plt1_upr = quantile(TCHN_cons_plt1, 0.05, na.rm = TRUE),
-                p1_mean = mean(TCHN_cons_p1, na.rm = TRUE),
-                p1_lwr = quantile(TCHN_cons_p1, 0.05, na.rm = TRUE),
-                p1_upr = quantile(TCHN_cons_p1, 0.05, na.rm = TRUE))
-    
+                       plt1_lwr = quantile(TCHN_cons_plt1, 0.025, na.rm = TRUE),
+                       plt1_upr = quantile(TCHN_cons_plt1, 0.975, na.rm = TRUE),
+                       p1_mean = mean(TCHN_cons_p1, na.rm = TRUE),
+                       p1_lwr = quantile(TCHN_cons_p1, 0.025, na.rm = TRUE),
+                       p1_upr = quantile(TCHN_cons_p1, 0.975, na.rm = TRUE))
     
     fish_list[[f]] <- LWdata_f
   }
