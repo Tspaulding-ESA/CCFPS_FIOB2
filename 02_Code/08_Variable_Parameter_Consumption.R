@@ -28,7 +28,7 @@ TeT <- readRDS(file.path("01_Data","Input","temps.rds")) %>%
   group_by(WaterYear, Date) %>%
   summarize(Temp = mean(Value, na.rm = TRUE))
 
-#Bring in the consumption functions
+#Bring in the consumption functions and parameter lookup tables
 g1 <- readRDS(file.path("01_Data","Input","g1.rds"))
 g2 <- readRDS(file.path("01_Data","Input","g2.rds"))
 g3 <- readRDS(file.path("01_Data","Input","g3.rds"))
@@ -38,8 +38,6 @@ pred_cmax_lu <- readRDS(file.path("01_Data","Input","pred_cmax_lu.rds"))
 r_sq_lu <- readRDS(file.path("01_Data","Input","r_sq_lu.rds"))
 ref_cmax_lu <- readRDS(file.path("01_Data","Input","ref_cmax_lu.rds"))
 con_allo_lu <- readRDS(file.path("01_Data","Input","ConAlloLU.rds"))
-
-# set up parameters based on age classes
 pvals <- c(rep(0.69, 2), rep(0.73, 1), rep(0.68, 1), rep(0.62, 6))
 
 NPERM <- 100
@@ -53,7 +51,7 @@ n_cores <- detectCores()
 cl <- makeCluster(n_cores - 2)
 doSNOW::registerDoSNOW(cl)
 
-TCHNconsmatVA_plt1 <-list()
+TCHNconsmatVA <-list()
 for(y in unique(LWdataA$wy)){
   LWdataA_y <- LWdataA[LWdataA[["wy"]] == y,]
   TeT_y <- TeT[TeT[["WaterYear"]] == y,]
@@ -78,8 +76,8 @@ for(y in unique(LWdataA$wy)){
   fish_list <- list()
   foreach(f = 1:nrow(LWdataA_y), .options.snow = opts) %dopar% {
     LWdata_f <- LWdataA_y[f,] |>
-      dplyr::mutate(WW = list(round(rnorm(NPERM,  LWdataA_y$fit[i], 
-                                   (LWdataA_y$fit[i] - LWdataA_y$lwr[i]) / 1.96),2))) |>
+      dplyr::mutate(WW = list(round(rnorm(NPERM,  fit, 
+                                   (fit - lwr) / 1.96),2))) |>
       dplyr::bind_cols(TeT_y) |>
       tidyr::unnest(WW) |>
       dplyr::mutate(WW = round(WW,3)) |>
@@ -110,6 +108,6 @@ for(y in unique(LWdataA$wy)){
     
     fish_list[[f]] <- LWdata_f
   }
-  TCHNconsmatVA_plt1[[y]] <- fish_list 
+  TCHNconsmatVA[[y]] <- fish_list 
 }
 stopCluster(cl = cluster)
