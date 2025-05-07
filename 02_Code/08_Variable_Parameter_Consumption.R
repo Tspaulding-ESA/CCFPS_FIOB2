@@ -43,8 +43,9 @@ pvals <- c(rep(0.69, 2), rep(0.73, 1), rep(0.68, 1), rep(0.62, 6))
 NPERM <- 10
 
 LWdataA <- LWdataA %>%
-  mutate(cap_wy = esaRmisc::water_year(date)) %>%
-  rename("cap_date" = date)
+  mutate(cap_wy = cfs.misc::water_year(date)) %>%
+  rename("cap_date" = date) |>
+  mutate(cap_date_ymd = lubridate::ymd(cap_date)) # Calculate once on vector
 
 # Setup the parallel processing
 # Cores
@@ -52,10 +53,17 @@ n_cores <- detectCores()
 cl <- makeCluster(n_cores - 4)
 doSNOW::registerDoSNOW(cl)
 
+  # Do these ops once rather than 1x per fish
+  TeT_tmp <- TeT |>
+    dplyr::rename("TE" = Temp) |>
+    dplyr::mutate(TE = round(TE,2)) |>
+    dplyr::left_join(pred_cmax_lu) |>
+    dplyr::left_join(ref_cmax_lu)
+
 TCHNconsmatVA <-list()
 for(y in unique(LWdataA$cap_wy)){
   LWdataA_y <- LWdataA[LWdataA[["cap_wy"]] == y,]
-  TeT_y <- TeT[TeT[["WaterYear"]] %in% c(y,y+1),]
+  TeT_y <- TeT_tmp[TeT_tmp[["WaterYear"]] %in% c(y,y+1),]
   
   print(y)
   
@@ -76,19 +84,16 @@ for(y in unique(LWdataA$cap_wy)){
   fish_list <- foreach(f = 1:nrow(LWdataA_y), .options.snow = opts) %dopar% {
     
     #Subset the temperature data for 70 weeks post-capture
-    TE <- TeT_y[TeT_y$Date <= (lubridate::ymd(LWdataA_y[f,]$cap_date) + 490),]$Temp
+    TE <- TeT_y[TeT_y$Date <= (LWdataA_y[f,]$cap_date_ymd + 490),]$TE 
+
     
     LWdata_f <- LWdataA_y[f,] |>
       dplyr::mutate(WW = list(round(rnorm(NPERM,  fit, 
                                    (fit - lwr) / 1.96),2))) |>
-      dplyr::bind_cols(TeT_y) |>
+      dplyr::left_join(TeT_y) |>
       tidyr::unnest(WW) |>
       dplyr::mutate(WW = round(WW,3)) |>
-      dplyr::rename("TE" = Temp) |>
-      dplyr::mutate(TE = round(TE,2)) |>
-      dplyr::left_join(pred_cmax_lu) |>
       dplyr::mutate(cmax_sds = cmax_se.fit/r_sq_lu[age][[1]]) |>
-      dplyr::left_join(ref_cmax_lu) |>
       dplyr::left_join(con_allo_lu)
     
     # Calculating the variation in consumption requires calculation by row
@@ -118,8 +123,8 @@ for(y in unique(LWdataA$cap_wy)){
       dplyr::mutate(TCHN_cons_plt1 = ifelse(TCHN_cons_plt1 < 0, 0, TCHN_cons_plt1),
                     TCHN_cons_p1 = ifelse(TCHN_cons_p1 < 0, 0, TCHN_cons_p1))|>
       # if the date is <= date of capture, set consumption to 0 as well
-      dplyr::mutate(TCHN_cons_plt1 = ifelse(Date <= lubridate::ymd(cap_date), NA, TCHN_cons_plt1),
-                    TCHN_cons_p1 = ifelse(Date <= lubridate::ymd(cap_date), NA, TCHN_cons_p1)) |>
+      dplyr::mutate(TCHN_cons_plt1 = ifelse(Date <= cap_date_ymd, NA, TCHN_cons_plt1),
+                    TCHN_cons_p1 = ifelse(Date <= cap_date_ymd, NA, TCHN_cons_p1)) |>
       dplyr::filter(!is.na(TCHN_cons_p1)) |>
       dplyr::ungroup() |>
       #Summarise by finding the mean, upper, and lower consumption values for each date for each fish
@@ -133,8 +138,10 @@ for(y in unique(LWdataA$cap_wy)){
     
     LWdata_f
   }
-  TCHNconsmatVA[[y]] <- bind_rows(fish_list)
+  TCHNconsmatVA[[as.character(y)]] <- bind_rows(fish_list)
 }
+
+
 stopCluster(cl = cl)
 
 TCHNconsmatVA <- bind_rows(TCHNconsmatVA)
