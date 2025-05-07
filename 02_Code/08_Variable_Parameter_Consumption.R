@@ -73,8 +73,7 @@ for(y in unique(LWdataA$cap_wy)){
   
   opts <- list(progress = progress)
   
-  fish_list <- list()
-  foreach(f = 1:nrow(LWdataA_y), .options.snow = opts) %dopar% {
+  fish_list <- foreach(f = 1:nrow(LWdataA_y), .options.snow = opts) %dopar% {
     
     #Subset the temperature data for 70 weeks post-capture
     TE <- TeT_y[TeT_y$Date <= (lubridate::ymd(LWdataA_y[f,]$cap_date) + 490),]$Temp
@@ -132,12 +131,10 @@ for(y in unique(LWdataA$cap_wy)){
                        p1_lwr = quantile(TCHN_cons_p1, 0.025, na.rm = TRUE),
                        p1_upr = quantile(TCHN_cons_p1, 0.975, na.rm = TRUE))
     
-    fish_list[[f]] <- LWdata_f
+    LWdata_f
   }
-  fish_list <- bind_rows(fish_list)
-  TCHNconsmatVA[[y]] <- fish_list 
+  TCHNconsmatVA[[y]] <- bind_rows(fish_list)
 }
-
 stopCluster(cl = cl)
 
 TCHNconsmatVA <- bind_rows(TCHNconsmatVA)
