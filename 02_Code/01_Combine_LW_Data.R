@@ -72,7 +72,8 @@ pfrs <- pfrs %>%
          fork_length_mm = ifelse(fork_length_mm == 368 & weight_kg == 0.12, 268, fork_length_mm),
          fork_length_mm = ifelse(fork_length_mm == 149 & weight_kg == 0.18, 249, fork_length_mm),
          fork_length_mm = ifelse(fork_length_mm == 138 & weight_kg == 0.13, 238, fork_length_mm),
-         fork_length_mm = ifelse(fork_length_mm == 255 & weight_kg == 0.05, 155, fork_length_mm)) %>%
+         fork_length_mm = ifelse(fork_length_mm == 255 & weight_kg == 0.05, 155, fork_length_mm)
+         ) %>%
   select(survey, date, gear, species, fork_length_mm, weight_kg)
 
 # Grab the EPFRRS data and reformat
@@ -114,7 +115,9 @@ catch_comb_lw = mutate(catch_comb_lw, weight_kg_pred = pred_weight(rr_mod, fork_
 
 ggplot(data = catch_comb_lw, aes(x = fork_length_mm)) +
   geom_point(aes(y = weight_kg), size = 2, alpha = 0.2) +
-  geom_line(aes(y = weight_kg_pred))
+  geom_line(aes(y = weight_kg_pred))+
+  scale_x_continuous(breaks = seq(0,1300,50))+
+  scale_y_continuous(breaks = seq(0,20,1))
 
 # 0.25 weight cutoff comes from Kimmerer et al. 2005
 catch_comb_lw_out = catch_comb_lw %>% 
@@ -123,11 +126,12 @@ catch_comb_lw_out = catch_comb_lw %>%
          prop_diff = diff/weight_kg)
 
 p = ggplot(data = catch_comb_lw_out, 
-           aes(x = log(fork_length_mm), y = log(weight_kg), col = prop_diff,
+           aes(x = fork_length_mm, y = weight_kg, col = prop_diff,
                text = paste("fl:", fork_length_mm, 
                             "\nwt:", weight_kg,
                             "\nwt_pred:", weight_kg_pred))) +
   geom_point() +
+  scale_x_continuous(breaks = seq(0,1300,50))+
   scale_color_continuous(type = "viridis")
 
 plotly::ggplotly(p)
@@ -139,29 +143,32 @@ catch_comb_comp = catch_comb %>%
 
 # nothing jumping out at me that seems like it needs closer inspection
 ggplot(catch_comb_comp, aes(x = gear, y = fork_length_mm, fill = in_lw)) +
-  geom_boxplot(alpha = 0.4)
+  geom_boxplot(alpha = 0.4)+
+  scale_fill_discrete(name = "Has Weight",
+                      breaks = c(FALSE, TRUE),
+                      labels = c("No","Yes"))
 
 write.csv(catch_comb, file.path("01_Data","Input","SBlw.csv"))
 
 
-# # below this point I was exploring the idea that the shorter fork lengths were driving 
-# # the poor for longer fork lengths (based on log-log model)
-# # not worth pursuing further but retaining here for FYI
-# fl_thresh = 482
-# 
-# rr_mod_short = MASS::rlm(log(weight_kg) ~ log(fork_length_mm), 
-#                          data = filter(catch_comb_lw, fork_length_mm < fl_thresh))
-# 
-# rr_mod_long = MASS::rlm(log(weight_kg) ~ log(fork_length_mm), 
-#                         data = filter(catch_comb_lw, fork_length_mm >= fl_thresh))
-# 
-# catch_comb_lw = catch_comb_lw %>% 
-#   mutate(weight_kg_pred_short = pred_weight(rr_mod_short, fork_length_mm),
-#          weight_kg_pred_long = pred_weight(rr_mod_long, fork_length_mm))
-# 
-# # different relationship fits best for short and long fish
-# # maybe obvious (statistical) reason for this?
-# ggplot(data = catch_comb_lw, aes(x = fork_length_mm)) +
-#   geom_point(aes(y = weight_kg), size = 2, alpha = 0.2) +
-#   geom_line(aes(y = weight_kg_pred_short), col = "red") +
-#   geom_line(aes(y = weight_kg_pred_long), col = "blue")
+# below this point I was exploring the idea that the shorter fork lengths were driving
+# the poor for longer fork lengths (based on log-log model)
+# not worth pursuing further but retaining here for FYI
+fl_thresh = 482
+
+rr_mod_short = MASS::rlm(log(weight_kg) ~ log(fork_length_mm),
+                         data = filter(catch_comb_lw, fork_length_mm < fl_thresh))
+
+rr_mod_long = MASS::rlm(log(weight_kg) ~ log(fork_length_mm),
+                        data = filter(catch_comb_lw, fork_length_mm >= fl_thresh))
+
+catch_comb_lw = catch_comb_lw %>%
+  mutate(weight_kg_pred_short = pred_weight(rr_mod_short, fork_length_mm),
+         weight_kg_pred_long = pred_weight(rr_mod_long, fork_length_mm))
+
+# different relationship fits best for short and long fish
+# maybe obvious (statistical) reason for this?
+ggplot(data = catch_comb_lw, aes(x = fork_length_mm)) +
+  geom_point(aes(y = weight_kg), size = 2, alpha = 0.1) +
+  geom_line(aes(y = weight_kg_pred_short), col = "red", linewidth = 1) +
+  geom_line(aes(y = weight_kg_pred_long), col = "blue", linewidth = 1)
