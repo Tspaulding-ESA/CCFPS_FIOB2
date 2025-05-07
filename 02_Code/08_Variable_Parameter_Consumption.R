@@ -40,7 +40,7 @@ ref_cmax_lu <- readRDS(file.path("01_Data","Input","ref_cmax_lu.rds"))
 con_allo_lu <- readRDS(file.path("01_Data","Input","ConAlloLU.rds"))
 pvals <- c(rep(0.69, 2), rep(0.73, 1), rep(0.68, 1), rep(0.62, 6))
 
-NPERM <- 100
+NPERM <- 10
 
 LWdataA <- LWdataA %>%
   mutate(cap_wy = esaRmisc::water_year(date)) %>%
@@ -49,7 +49,7 @@ LWdataA <- LWdataA %>%
 # Setup the parallel processing
 # Cores
 n_cores <- detectCores()
-cl <- makeCluster(n_cores - 2)
+cl <- makeCluster(n_cores - 4)
 doSNOW::registerDoSNOW(cl)
 
 TCHNconsmatVA <-list()
@@ -106,11 +106,11 @@ for(y in unique(LWdataA$cap_wy)){
         rnorm(NPERM, tmp$cmaxi_mean, tmp$cmaxi_sds) * 
         tmp$WW * 1 * #pval == 1
         sample(dietfVCHN, NPERM, replace = T)
-      tmp <- bind_cols(tmp, "TCHN_cons_p1" = TCHN_cons_p1, "TCHN_cons_plt1" = TCHN_cons_plt1)
+      tmp <- dplyr::bind_cols(tmp, "TCHN_cons_p1" = TCHN_cons_p1, "TCHN_cons_plt1" = TCHN_cons_plt1)
       tmp_list[[i]] <- tmp
     }
     # rejoin everything back together
-    LWdata_f <- bind_rows(tmp_list)
+    LWdata_f <- dplyr::bind_rows(tmp_list)
     #rm(tmp_list)
     
     # Continue
@@ -121,8 +121,8 @@ for(y in unique(LWdataA$cap_wy)){
       # if the date is <= date of capture, set consumption to 0 as well
       dplyr::mutate(TCHN_cons_plt1 = ifelse(Date <= lubridate::ymd(cap_date), NA, TCHN_cons_plt1),
                     TCHN_cons_p1 = ifelse(Date <= lubridate::ymd(cap_date), NA, TCHN_cons_p1)) |>
-      filter(!is.na(TCHN_cons_p1)) |>
-      ungroup() |>
+      dplyr::filter(!is.na(TCHN_cons_p1)) |>
+      dplyr::ungroup() |>
       #Summarise by finding the mean, upper, and lower consumption values for each date for each fish
       dplyr::group_by(X, species, survey, gear, cap_wy, cap_date, fork_length_mm, age, Date) |>
       dplyr::summarize(plt1_mean = mean(TCHN_cons_plt1, na.rm = TRUE),
@@ -134,8 +134,12 @@ for(y in unique(LWdataA$cap_wy)){
     
     fish_list[[f]] <- LWdata_f
   }
+  fish_list <- bind_rows(fish_list)
   TCHNconsmatVA[[y]] <- fish_list 
 }
+
 stopCluster(cl = cl)
+
+TCHNconsmatVA <- bind_rows(TCHNconsmatVA)
 
 saveRDS(TCHNconsmatVA,file.path("01_Data","Output","Tables","TCHNconsmatVA.rds"))
