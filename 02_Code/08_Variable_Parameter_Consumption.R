@@ -21,8 +21,13 @@ library(doSNOW)
 library(progress)
 set.seed(123)
 
+n_fish = 1000
 # Bring in the Data
 LWdataA <- readRDS(file.path("01_Data","Output","LWdataA.rds"))
+
+## Subset for testing purposes
+LWdataA = LWdataA[sample(seq(nrow(LWdataA)), n_fish),]
+
 dietfVCHN <- readRDS(file.path("01_Data","Input","diet_fraction_variable_analysis.rds"))
 TeT <- readRDS(file.path("01_Data","Input","temps.rds")) %>%
   group_by(WaterYear, Date) %>%
@@ -47,11 +52,12 @@ LWdataA <- LWdataA %>%
   rename("cap_date" = date) |>
   mutate(cap_date_ymd = lubridate::ymd(cap_date)) # Calculate once on vector
 
+
 # Setup the parallel processing
 # Cores
 n_cores <- detectCores()
-cl <- makeCluster(n_cores - 4)
-doSNOW::registerDoSNOW(cl)
+## cl <- makeCluster(n_cores - 4)
+## doSNOW::registerDoSNOW(cl)
 
   # Do these ops once rather than 1x per fish
   TeT_tmp <- TeT |>
@@ -61,6 +67,7 @@ doSNOW::registerDoSNOW(cl)
     dplyr::left_join(ref_cmax_lu)
 
 TCHNconsmatVA <-list()
+Rprof("Move_joins")
 for(y in unique(LWdataA$cap_wy)){
   LWdataA_y <- LWdataA[LWdataA[["cap_wy"]] == y,]
   TeT_y <- TeT_tmp[TeT_tmp[["WaterYear"]] %in% c(y,y+1),]
@@ -81,7 +88,8 @@ for(y in unique(LWdataA$cap_wy)){
   
   opts <- list(progress = progress)
   
-  fish_list <- foreach(f = 1:nrow(LWdataA_y), .options.snow = opts) %dopar% {
+  ## fish_list <- foreach(f = 1:nrow(LWdataA_y), .options.snow = opts) %dopar% {
+  fish_list <- parallel::mclapply(seq(nrow(LWdataA_y)), function(f) {
     
     #Subset the temperature data for 70 weeks post-capture
     TE <- TeT_y[TeT_y$Date <= (LWdataA_y[f,]$cap_date_ymd + 490),]$TE 
@@ -104,12 +112,12 @@ for(y in unique(LWdataA$cap_wy)){
         rnorm(NPERM, tmp$ref_cmax_mean,tmp$ref_cmax_sds) * 
         rnorm(NPERM, tmp$cmaxi_mean, tmp$cmaxi_sds) * 
         tmp$WW * pvals[tmp$age] * #pva; based on age
-        sample(dietfVCHN, NPERM, replace = T)
+        sample(dietfVCHN, NPERM, replace = TRUE)
       TCHN_cons_p1 = rnorm(NPERM, tmp$cmax_mean, tmp$cmax_sds) / 
         rnorm(NPERM, tmp$ref_cmax_mean,tmp$ref_cmax_sds) * 
         rnorm(NPERM, tmp$cmaxi_mean, tmp$cmaxi_sds) * 
         tmp$WW * 1 * #pval == 1
-        sample(dietfVCHN, NPERM, replace = T)
+        sample(dietfVCHN, NPERM, replace = TRUE)
       tmp <- dplyr::bind_cols(tmp, "TCHN_cons_p1" = TCHN_cons_p1, "TCHN_cons_plt1" = TCHN_cons_plt1)
       tmp_list[[i]] <- tmp
     }
@@ -137,12 +145,13 @@ for(y in unique(LWdataA$cap_wy)){
                        p1_upr = quantile(TCHN_cons_p1, 0.975, na.rm = TRUE))
     
     LWdata_f
-  }
+  }, mc.cores = detectCores() - 4L )
+  
   TCHNconsmatVA[[as.character(y)]] <- bind_rows(fish_list)
 }
 
-
-stopCluster(cl = cl)
+Rprof(NULL)
+## stopCluster(cl = cl)
 
 TCHNconsmatVA <- bind_rows(TCHNconsmatVA)
 
