@@ -59,22 +59,26 @@ n_cores <- detectCores()
 ## cl <- makeCluster(n_cores - 4)
 ## doSNOW::registerDoSNOW(cl)
 
-  # Do these ops once rather than 1x per fish
-  TeT_tmp <- TeT |>
-    dplyr::rename("TE" = Temp) |>
-    dplyr::mutate(TE = round(TE,2)) |>
-    dplyr::left_join(pred_cmax_lu) |>
-    dplyr::left_join(ref_cmax_lu)
+# Do these ops once rather than 1x per fish
+TeT_tmp <- TeT |>
+  dplyr::rename("TE" = Temp) |>
+  dplyr::mutate(TE = round(TE,2)) |>
+  dplyr::left_join(pred_cmax_lu) |>
+  dplyr::left_join(ref_cmax_lu)
 
-TCHNconsmatVA <-list()
-Rprof("Vectorize", filter.callframes = TRUE)
 
-for(y in unique(LWdataA$cap_wy)){
+#For profiling
+Rprof("lapply", filter.callframes = TRUE)
+
+# lapply() is more efficient than growing a list
+TCHNconsmatVA = lapply(unique(LWdataA$cap_wy), function(y) {
   LWdataA_y <- LWdataA[LWdataA[["cap_wy"]] == y,]
   TeT_y <- TeT_tmp[TeT_tmp[["WaterYear"]] %in% c(y,y+1),]
   
   print(y)
-  
+
+  # Progress bar adds overhead 
+  if(FALSE){
   # Progress Bar
   iter = nrow(LWdataA_y)
   pb <- progress_bar$new(
@@ -88,6 +92,7 @@ for(y in unique(LWdataA$cap_wy)){
   } 
   
   opts <- list(progress = progress)
+  }
   
   ## fish_list <- foreach(f = 1:nrow(LWdataA_y), .options.snow = opts) %dopar% {
   fish_list <- parallel::mclapply(seq(nrow(LWdataA_y)), function(f) {
@@ -95,7 +100,7 @@ for(y in unique(LWdataA$cap_wy)){
     #Subset the temperature data for 70 weeks post-capture
     TE <- TeT_y[TeT_y$Date <= (LWdataA_y[f,]$cap_date_ymd + 490),]$TE 
 
-    
+    # Lots of time here
     LWdata_f <- LWdataA_y[f,] |>
       dplyr::mutate(WW = list(round(rnorm(NPERM,  fit, fit_sd),2))) |>
       dplyr::left_join(TeT_y) |>
@@ -106,7 +111,7 @@ for(y in unique(LWdataA$cap_wy)){
     
     # Calculating the variation in consumption requires calculation by row
     
-    # ME - It does not, in fact - by rep the columns, we can vectorize this.
+    # ME - It does not, in fact. By rep the data, we can vectorize this.
       TCHN_cons_plt1 = rnorm(NPERM * NPERM, rep(LWdata_f$cmax_mean, NPERM), rep(LWdata_f$cmax_sds, NPERM)) / 
         rnorm(NPERM * NPERM, LWdata_f$ref_cmax_mean[1], LWdata_f$ref_cmax_sds[1]) * # constant - only need one
         rnorm(NPERM * NPERM, rep(LWdata_f$cmaxi_mean, NPERM), rep(LWdata_f$cmaxi_sds, NPERM)) * 
@@ -121,14 +126,18 @@ for(y in unique(LWdataA$cap_wy)){
     LWdata_f = dplyr::bind_cols(LWdata_f[rep(seq(nrow(LWdata_f)), NPERM),],
                                   "TCHN_cons_p1" = TCHN_cons_p1,
                                   "TCHN_cons_plt1" = TCHN_cons_plt1)
+
+    ## ifelse() is inefficient
+    #If the predicted value is below 0, fix to 0
+    LWdata_f$TCHN_cons_plt1[LWdata_f$TCHN_cons_plt1 < 0] = 0
+    LWdata_f$TCHN_cons_p1[LWdata_f$TCHN_cons_p1 < 0] = 0
+    # if the date is <= date of capture, set consumption to 0 as well
+    LWdata_f$TCHN_cons_plt1[LWdata_f$Date <= LWdata_f$cap_date_ymd] = NA
+    LWdata_f$TCHN_cons_p1[LWdata_f$Date <= LWdata_f$cap_date_ymd] = NA
+
+    # Lots of time here
     # Continue
     LWdata_f <- LWdata_f |>
-      #If the predicted value is below 0, fix to 0
-      dplyr::mutate(TCHN_cons_plt1 = ifelse(TCHN_cons_plt1 < 0, 0, TCHN_cons_plt1),
-                    TCHN_cons_p1 = ifelse(TCHN_cons_p1 < 0, 0, TCHN_cons_p1))|>
-      # if the date is <= date of capture, set consumption to 0 as well
-      dplyr::mutate(TCHN_cons_plt1 = ifelse(Date <= cap_date_ymd, NA, TCHN_cons_plt1),
-                    TCHN_cons_p1 = ifelse(Date <= cap_date_ymd, NA, TCHN_cons_p1)) |>
       dplyr::filter(!is.na(TCHN_cons_p1)) |>
       dplyr::ungroup() |>
       #Summarise by finding the mean, upper, and lower consumption values for each date for each fish
@@ -141,10 +150,11 @@ for(y in unique(LWdataA$cap_wy)){
                        p1_upr = quantile(TCHN_cons_p1, 0.975, na.rm = TRUE))
     
     LWdata_f
+#  }
   }, mc.cores = detectCores() - 4L )
   
-  TCHNconsmatVA[[as.character(y)]] <- bind_rows(fish_list)
-}
+  bind_rows(fish_list)
+})
 
 Rprof(NULL)
 ## stopCluster(cl = cl)
