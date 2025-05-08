@@ -21,11 +21,11 @@ library(doSNOW)
 library(progress)
 set.seed(123)
 
-n_fish = 1000
 # Bring in the Data
 LWdataA <- readRDS(file.path("01_Data","Output","LWdataA.rds"))
 
 ## Subset for testing purposes
+n_fish = 1000
 LWdataA = LWdataA[sample(seq(nrow(LWdataA)), n_fish),]
 
 dietfVCHN <- readRDS(file.path("01_Data","Input","diet_fraction_variable_analysis.rds"))
@@ -55,7 +55,7 @@ LWdataA <- LWdataA |>
   mutate(fit_sd =  (fit - lwr) / 1.96) # Calculate vectorized for later
 
 # Having in list adds unnecessary overhead
-r_sq_lu = unlist(r_sq_lu)
+r_sq_lu <- unlist(r_sq_lu)
 
 # Setup the parallel processing
 # Cores
@@ -115,31 +115,31 @@ TCHNconsmatVA = lapply(unique(LWdataA$cap_wy), function(y) {
     # Calculating the variation in consumption requires calculation by row
     
     # ME - It does not, in fact. By rep the data, we can vectorize this.
-    TCHN_cons_plt1 = rnorm(NPERM * NPERM, rep(LWdata_f$cmax_mean, NPERM), rep(LWdata_f$cmax_sds, NPERM)) / 
+    TCHN_cons_plt1 <- rnorm(NPERM * NPERM, rep(LWdata_f$cmax_mean, NPERM), rep(LWdata_f$cmax_sds, NPERM)) / 
       rnorm(NPERM * NPERM, LWdata_f$ref_cmax_mean[1], LWdata_f$ref_cmax_sds[1]) * # constant - only need one
       rnorm(NPERM * NPERM, rep(LWdata_f$cmaxi_mean, NPERM), rep(LWdata_f$cmaxi_sds, NPERM)) * 
       rep(LWdata_f$WW, NPERM) * pvals[rep(LWdata_f$age, NPERM)] * #pva; based on age
       sample(dietfVCHN, NPERM * NPERM, replace = TRUE)
-    TCHN_cons_p1 = rnorm(NPERM * NPERM, rep(LWdata_f$cmax_mean, NPERM), rep(LWdata_f$cmax_sds, NPERM)) / 
+    TCHN_cons_p1 <- rnorm(NPERM * NPERM, rep(LWdata_f$cmax_mean, NPERM), rep(LWdata_f$cmax_sds, NPERM)) / 
       rnorm(NPERM * NPERM, LWdata_f$ref_cmax_mean[1],LWdata_f$ref_cmax_sds[1]) * 
       rnorm(NPERM * NPERM, rep(LWdata_f$cmaxi_mean, NPERM), rep(LWdata_f$cmaxi_sds, NPERM)) * 
       rep(LWdata_f$WW, NPERM) * #1 * #pval == 1
       sample(dietfVCHN, NPERM * NPERM, replace = TRUE)
     
-    LWdata_f = dplyr::bind_cols(LWdata_f[rep(seq(nrow(LWdata_f)), NPERM),],
+    LWdata_f <- dplyr::bind_cols(LWdata_f[rep(seq(nrow(LWdata_f)), NPERM),],
                                 "TCHN_cons_p1" = TCHN_cons_p1,
                                 "TCHN_cons_plt1" = TCHN_cons_plt1)
 
     ## ifelse() is inefficient
     #If the predicted value is below 0, fix to 0
-    LWdata_f$TCHN_cons_plt1[LWdata_f$TCHN_cons_plt1 < 0] = 0
-    LWdata_f$TCHN_cons_p1[LWdata_f$TCHN_cons_p1 < 0] = 0
+    LWdata_f$TCHN_cons_plt1[LWdata_f$TCHN_cons_plt1 < 0] <- 0
+    LWdata_f$TCHN_cons_p1[LWdata_f$TCHN_cons_p1 < 0] <- 0
 
     # if the date is <= date of capture, set consumption to 0 as well
     ## LWdata_f$TCHN_cons_plt1[LWdata_f$Date <= LWdata_f$cap_date_ymd] = NA
 
     # Since we remove the NA values later in the calc, we can do this as a one-op
-    LWdata_f = LWdata_f |> dplyr::filter(!(Date <= cap_date_ymd) & !is.na(TCHN_cons_p1))
+    LWdata_f <- LWdata_f |> dplyr::filter(!(Date <= cap_date_ymd) & !is.na(TCHN_cons_p1))
 
     # Lots of time here
     # Continue
