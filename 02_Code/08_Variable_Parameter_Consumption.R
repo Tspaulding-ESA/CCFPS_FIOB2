@@ -67,7 +67,7 @@ n_cores <- detectCores()
     dplyr::left_join(ref_cmax_lu)
 
 TCHNconsmatVA <-list()
-Rprof("Add cols")
+Rprof("Vectorize", filter.callframes = TRUE)
 
 for(y in unique(LWdataA$cap_wy)){
   LWdataA_y <- LWdataA[LWdataA[["cap_wy"]] == y,]
@@ -105,25 +105,22 @@ for(y in unique(LWdataA$cap_wy)){
       dplyr::left_join(con_allo_lu)
     
     # Calculating the variation in consumption requires calculation by row
-    tmp_list <- lapply(seq(nrow(LWdata_f)), function(i) {
-      tmp <- LWdata_f[i,]
-      TCHN_cons_plt1 = rnorm(NPERM, tmp$cmax_mean, tmp$cmax_sds) / 
-        rnorm(NPERM, tmp$ref_cmax_mean,tmp$ref_cmax_sds) * 
-        rnorm(NPERM, tmp$cmaxi_mean, tmp$cmaxi_sds) * 
-        tmp$WW * pvals[tmp$age] * #pva; based on age
-        sample(dietfVCHN, NPERM, replace = TRUE)
-      TCHN_cons_p1 = rnorm(NPERM, tmp$cmax_mean, tmp$cmax_sds) / 
-        rnorm(NPERM, tmp$ref_cmax_mean,tmp$ref_cmax_sds) * 
-        rnorm(NPERM, tmp$cmaxi_mean, tmp$cmaxi_sds) * 
-        tmp$WW * 1 * #pval == 1
-        sample(dietfVCHN, NPERM, replace = TRUE)
-      dplyr::bind_cols(tmp, "TCHN_cons_p1" = TCHN_cons_p1, "TCHN_cons_plt1" = TCHN_cons_plt1)
-      
-    })
-    # rejoin everything back together
-    LWdata_f <- dplyr::bind_rows(tmp_list)
-    #rm(tmp_list)
     
+    # ME - It does not, in fact - by rep the columns, we can vectorize this.
+      TCHN_cons_plt1 = rnorm(NPERM * NPERM, rep(LWdata_f$cmax_mean, NPERM), rep(LWdata_f$cmax_sds, NPERM)) / 
+        rnorm(NPERM * NPERM, LWdata_f$ref_cmax_mean[1], LWdata_f$ref_cmax_sds[1]) * # constant - only need one
+        rnorm(NPERM * NPERM, rep(LWdata_f$cmaxi_mean, NPERM), rep(LWdata_f$cmaxi_sds, NPERM)) * 
+        rep(LWdata_f$WW, NPERM) * pvals[rep(LWdata_f$age, NPERM)] * #pva; based on age
+        sample(dietfVCHN, NPERM * NPERM, replace = TRUE)
+      TCHN_cons_p1 = rnorm(NPERM * NPERM, rep(LWdata_f$cmax_mean, NPERM), rep(LWdata_f$cmax_sds, NPERM)) / 
+        rnorm(NPERM * NPERM, LWdata_f$ref_cmax_mean[1],LWdata_f$ref_cmax_sds[1]) * 
+        rnorm(NPERM * NPERM, rep(LWdata_f$cmaxi_mean, NPERM), rep(LWdata_f$cmaxi_sds, NPERM)) * 
+        rep(LWdata_f$WW, NPERM) * #1 * #pval == 1
+        sample(dietfVCHN, NPERM * NPERM, replace = TRUE)
+
+    LWdata_f = dplyr::bind_cols(LWdata_f[rep(seq(nrow(LWdata_f)), NPERM),],
+                                  "TCHN_cons_p1" = TCHN_cons_p1,
+                                  "TCHN_cons_plt1" = TCHN_cons_plt1)
     # Continue
     LWdata_f <- LWdata_f |>
       #If the predicted value is below 0, fix to 0
@@ -151,7 +148,7 @@ for(y in unique(LWdataA$cap_wy)){
 
 Rprof(NULL)
 ## stopCluster(cl = cl)
-
+ 
 TCHNconsmatVA <- bind_rows(TCHNconsmatVA)
 
 saveRDS(TCHNconsmatVA,file.path("01_Data","Output","Tables","TCHNconsmatVA.rds"))
