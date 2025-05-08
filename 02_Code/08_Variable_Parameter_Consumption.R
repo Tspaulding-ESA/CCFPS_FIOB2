@@ -48,7 +48,8 @@ pvals <- c(rep(0.69, 2), rep(0.73, 1), rep(0.68, 1), rep(0.62, 6))
 NPERM <- 10
 
 LWdataA <- LWdataA |>
-  mutate(cap_wy = cfs.misc::water_year(date)) |>
+  ## mutate(cap_wy = cfs.misc::water_year(date)) |>
+  mutate(cap_wy = esaRmisc::water_year(date)) |>
   rename("cap_date" = date) |>
   mutate(cap_date_ymd = lubridate::ymd(cap_date)) |> # Calculate once on vector
   mutate(fit_sd =  (fit - lwr) / 1.96) # Calculate vectorized for later
