@@ -29,8 +29,8 @@ LWdataA <- readRDS(file.path("01_Data","Output","LWdataA.rds"))
 LWdataA = LWdataA[sample(seq(nrow(LWdataA)), n_fish),]
 
 dietfVCHN <- readRDS(file.path("01_Data","Input","diet_fraction_variable_analysis.rds"))
-TeT <- readRDS(file.path("01_Data","Input","temps.rds")) %>%
-  group_by(WaterYear, Date) %>%
+TeT <- readRDS(file.path("01_Data","Input","temps.rds")) |>
+  group_by(WaterYear, Date) |>
   summarize(Temp = mean(Value, na.rm = TRUE))
 
 #Bring in the consumption functions and parameter lookup tables
@@ -47,11 +47,14 @@ pvals <- c(rep(0.69, 2), rep(0.73, 1), rep(0.68, 1), rep(0.62, 6))
 
 NPERM <- 10
 
-LWdataA <- LWdataA %>%
-  mutate(cap_wy = cfs.misc::water_year(date)) %>%
+LWdataA <- LWdataA |>
+  mutate(cap_wy = cfs.misc::water_year(date)) |>
   rename("cap_date" = date) |>
   mutate(cap_date_ymd = lubridate::ymd(cap_date)) |> # Calculate once on vector
   mutate(fit_sd =  (fit - lwr) / 1.96) # Calculate vectorized for later
+
+# Having in list adds unnecessary overhead
+r_sq_lu = unlist(r_sq_lu)
 
 # Setup the parallel processing
 # Cores
@@ -100,45 +103,46 @@ TCHNconsmatVA = lapply(unique(LWdataA$cap_wy), function(y) {
     #Subset the temperature data for 70 weeks post-capture
     TE <- TeT_y[TeT_y$Date <= (LWdataA_y[f,]$cap_date_ymd + 490),]$TE 
 
-    # Lots of time here
+    # Lots of time here - rearranging gives small gain
     LWdata_f <- LWdataA_y[f,] |>
-      dplyr::mutate(WW = list(round(rnorm(NPERM,  fit, fit_sd),2))) |>
       dplyr::left_join(TeT_y) |>
+      dplyr::mutate(cmax_sds = cmax_se.fit/r_sq_lu[age]) |>
+      dplyr::mutate(WW = list(round(rnorm(NPERM,  fit, fit_sd),3))) |>
       tidyr::unnest(WW) |>
-      dplyr::mutate(WW = round(WW,3)) |>
-      dplyr::mutate(cmax_sds = cmax_se.fit/r_sq_lu[age][[1]]) |>
       dplyr::left_join(con_allo_lu)
     
     # Calculating the variation in consumption requires calculation by row
     
     # ME - It does not, in fact. By rep the data, we can vectorize this.
-      TCHN_cons_plt1 = rnorm(NPERM * NPERM, rep(LWdata_f$cmax_mean, NPERM), rep(LWdata_f$cmax_sds, NPERM)) / 
-        rnorm(NPERM * NPERM, LWdata_f$ref_cmax_mean[1], LWdata_f$ref_cmax_sds[1]) * # constant - only need one
-        rnorm(NPERM * NPERM, rep(LWdata_f$cmaxi_mean, NPERM), rep(LWdata_f$cmaxi_sds, NPERM)) * 
-        rep(LWdata_f$WW, NPERM) * pvals[rep(LWdata_f$age, NPERM)] * #pva; based on age
-        sample(dietfVCHN, NPERM * NPERM, replace = TRUE)
-      TCHN_cons_p1 = rnorm(NPERM * NPERM, rep(LWdata_f$cmax_mean, NPERM), rep(LWdata_f$cmax_sds, NPERM)) / 
-        rnorm(NPERM * NPERM, LWdata_f$ref_cmax_mean[1],LWdata_f$ref_cmax_sds[1]) * 
-        rnorm(NPERM * NPERM, rep(LWdata_f$cmaxi_mean, NPERM), rep(LWdata_f$cmaxi_sds, NPERM)) * 
-        rep(LWdata_f$WW, NPERM) * #1 * #pval == 1
-        sample(dietfVCHN, NPERM * NPERM, replace = TRUE)
-
+    TCHN_cons_plt1 = rnorm(NPERM * NPERM, rep(LWdata_f$cmax_mean, NPERM), rep(LWdata_f$cmax_sds, NPERM)) / 
+      rnorm(NPERM * NPERM, LWdata_f$ref_cmax_mean[1], LWdata_f$ref_cmax_sds[1]) * # constant - only need one
+      rnorm(NPERM * NPERM, rep(LWdata_f$cmaxi_mean, NPERM), rep(LWdata_f$cmaxi_sds, NPERM)) * 
+      rep(LWdata_f$WW, NPERM) * pvals[rep(LWdata_f$age, NPERM)] * #pva; based on age
+      sample(dietfVCHN, NPERM * NPERM, replace = TRUE)
+    TCHN_cons_p1 = rnorm(NPERM * NPERM, rep(LWdata_f$cmax_mean, NPERM), rep(LWdata_f$cmax_sds, NPERM)) / 
+      rnorm(NPERM * NPERM, LWdata_f$ref_cmax_mean[1],LWdata_f$ref_cmax_sds[1]) * 
+      rnorm(NPERM * NPERM, rep(LWdata_f$cmaxi_mean, NPERM), rep(LWdata_f$cmaxi_sds, NPERM)) * 
+      rep(LWdata_f$WW, NPERM) * #1 * #pval == 1
+      sample(dietfVCHN, NPERM * NPERM, replace = TRUE)
+    
     LWdata_f = dplyr::bind_cols(LWdata_f[rep(seq(nrow(LWdata_f)), NPERM),],
-                                  "TCHN_cons_p1" = TCHN_cons_p1,
-                                  "TCHN_cons_plt1" = TCHN_cons_plt1)
+                                "TCHN_cons_p1" = TCHN_cons_p1,
+                                "TCHN_cons_plt1" = TCHN_cons_plt1)
 
     ## ifelse() is inefficient
     #If the predicted value is below 0, fix to 0
     LWdata_f$TCHN_cons_plt1[LWdata_f$TCHN_cons_plt1 < 0] = 0
     LWdata_f$TCHN_cons_p1[LWdata_f$TCHN_cons_p1 < 0] = 0
+
     # if the date is <= date of capture, set consumption to 0 as well
-    LWdata_f$TCHN_cons_plt1[LWdata_f$Date <= LWdata_f$cap_date_ymd] = NA
-    LWdata_f$TCHN_cons_p1[LWdata_f$Date <= LWdata_f$cap_date_ymd] = NA
+    ## LWdata_f$TCHN_cons_plt1[LWdata_f$Date <= LWdata_f$cap_date_ymd] = NA
+
+    # Since we remove the NA values later in the calc, we can do this as a one-op
+    LWdata_f = LWdata_f |> dplyr::filter(!(Date <= cap_date_ymd) & !is.na(TCHN_cons_p1))
 
     # Lots of time here
     # Continue
     LWdata_f <- LWdata_f |>
-      dplyr::filter(!is.na(TCHN_cons_p1)) |>
       dplyr::ungroup() |>
       #Summarise by finding the mean, upper, and lower consumption values for each date for each fish
       dplyr::group_by(X, species, survey, gear, cap_wy, cap_date, fork_length_mm, age, Date) |>
