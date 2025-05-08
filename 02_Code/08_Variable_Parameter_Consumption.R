@@ -50,8 +50,8 @@ NPERM <- 10
 LWdataA <- LWdataA %>%
   mutate(cap_wy = cfs.misc::water_year(date)) %>%
   rename("cap_date" = date) |>
-  mutate(cap_date_ymd = lubridate::ymd(cap_date)) # Calculate once on vector
-
+  mutate(cap_date_ymd = lubridate::ymd(cap_date)) |> # Calculate once on vector
+  mutate(fit_sd =  (fit - lwr) / 1.96) # Calculate vectorized for later
 
 # Setup the parallel processing
 # Cores
@@ -67,7 +67,8 @@ n_cores <- detectCores()
     dplyr::left_join(ref_cmax_lu)
 
 TCHNconsmatVA <-list()
-Rprof("Move_joins")
+Rprof("Add cols")
+
 for(y in unique(LWdataA$cap_wy)){
   LWdataA_y <- LWdataA[LWdataA[["cap_wy"]] == y,]
   TeT_y <- TeT_tmp[TeT_tmp[["WaterYear"]] %in% c(y,y+1),]
@@ -96,8 +97,7 @@ for(y in unique(LWdataA$cap_wy)){
 
     
     LWdata_f <- LWdataA_y[f,] |>
-      dplyr::mutate(WW = list(round(rnorm(NPERM,  fit, 
-                                   (fit - lwr) / 1.96),2))) |>
+      dplyr::mutate(WW = list(round(rnorm(NPERM,  fit, fit_sd),2))) |>
       dplyr::left_join(TeT_y) |>
       tidyr::unnest(WW) |>
       dplyr::mutate(WW = round(WW,3)) |>
@@ -105,8 +105,7 @@ for(y in unique(LWdataA$cap_wy)){
       dplyr::left_join(con_allo_lu)
     
     # Calculating the variation in consumption requires calculation by row
-    tmp_list <- list()
-    for(i in 1:nrow(LWdata_f)){
+    tmp_list <- lapply(seq(nrow(LWdata_f)), function(i) {
       tmp <- LWdata_f[i,]
       TCHN_cons_plt1 = rnorm(NPERM, tmp$cmax_mean, tmp$cmax_sds) / 
         rnorm(NPERM, tmp$ref_cmax_mean,tmp$ref_cmax_sds) * 
@@ -118,9 +117,9 @@ for(y in unique(LWdataA$cap_wy)){
         rnorm(NPERM, tmp$cmaxi_mean, tmp$cmaxi_sds) * 
         tmp$WW * 1 * #pval == 1
         sample(dietfVCHN, NPERM, replace = TRUE)
-      tmp <- dplyr::bind_cols(tmp, "TCHN_cons_p1" = TCHN_cons_p1, "TCHN_cons_plt1" = TCHN_cons_plt1)
-      tmp_list[[i]] <- tmp
-    }
+      dplyr::bind_cols(tmp, "TCHN_cons_p1" = TCHN_cons_p1, "TCHN_cons_plt1" = TCHN_cons_plt1)
+      
+    })
     # rejoin everything back together
     LWdata_f <- dplyr::bind_rows(tmp_list)
     #rm(tmp_list)
