@@ -43,24 +43,20 @@ ref_cmax_lu <- readRDS(file.path("01_Data","Input","ref_cmax_lu.rds"))
 con_allo_lu <- readRDS(file.path("01_Data","Input","ConAlloLU.rds"))
 pvals <- c(rep(0.69, 2), rep(0.73, 1), rep(0.68, 1), rep(0.62, 6))
 
+# Probability of continuing residence from CCF Tagging Study
+emmig <- readRDS(file.path("01_Data","Input","emigration_probs.rds"))
+
 LWdataA <- LWdataA |>
-  ## mutate(cap_wy = cfs.misc::water_year(date)) |>
   mutate(cap_wy = esaRmisc::water_year(date)) |>
   rename("cap_date" = date) |>
-  mutate(cap_date_ymd = lubridate::ymd(cap_date)) |> # Calculate once on vector
-  mutate(fit_sd =  (fit - lwr) / 1.96) # Calculate vectorized for later
-
+  mutate(cap_date = lubridate::ymd(cap_date)) |> # Calculate once on vector
+  mutate(fit_sd =  (fit - lwr) / 1.96) |># Calculate vectorized for later
+  left_join(emmig)
+  
+  
 # Having in list adds unnecessary overhead
 r_sq_lu <- data.frame(age = c(1:10),
                       r_sq = unlist(r_sq_lu))
-
-# Setup the parallel processing
-# Cores
-n_cores <- detectCores()
-cl <- makeSOCKcluster(n_cores - 4)
-doSNOW::registerDoSNOW(cl)
-snow::clusterExport(cl = cl, list = c("con_allo_lu", "NPERM","pvals", 
-                                      "dietfVCHN"))
 
 # Do these ops once rather than 1x per fish
 TeT_tmp <- TeT |>
@@ -70,10 +66,18 @@ TeT_tmp <- TeT |>
   dplyr::left_join(ref_cmax_lu) |>
   dplyr::left_join(r_sq_lu)
 
+# Setup the parallel processing
+# Cores
+n_cores <- detectCores()
+cl <- makeSOCKcluster(n_cores - 4)
+doSNOW::registerDoSNOW(cl)
+snow::clusterExport(cl = cl, list = c("con_allo_lu", "NPERM","pvals", 
+                                      "dietfVCHN","emmig","TeT_tmp"))
+
 # lapply() is more efficient than growing a list
 TCHNconsmatVA = lapply(unique(LWdataA$cap_wy), function(y) {
   LWdataA_y <- LWdataA[LWdataA[["cap_wy"]] == y,]
-  TeT_y <- TeT_tmp[TeT_tmp[["WaterYear"]] %in% c(y,y+1),]
+  #LWdataA_y <- LWdataA_y[1:10,] #reduce for testing
   
   print(y)
 
@@ -96,13 +100,19 @@ TCHNconsmatVA = lapply(unique(LWdataA$cap_wy), function(y) {
   
   fish_list <- foreach(f = 1:nrow(LWdataA_y), .options.snow = opts) %dopar% {
   #fish_list <- parallel::mclapply(seq(nrow(LWdataA_y)), function(f) {
-    
-    #Subset the temperature data for 70 weeks post-capture
-    TE <- TeT_y[TeT_y$Date <= (LWdataA_y[f,]$cap_date_ymd + 490),]$TE 
 
     # Lots of time here - rearranging gives small gain
     LWdata_f <- LWdataA_y[f,] |>
-      dplyr::left_join(TeT_y) |>
+      dplyr::left_join(TeT_tmp) |>
+      dplyr::mutate(days = as.numeric(Date-cap_date)) |>
+      dplyr::filter(days > 0) |>
+      dplyr::filter(days < exit_days) |>
+      # dplyr::left_join(emmig) |>
+      # tidyr::fill(survival,sd,.direction = "down") |>
+      # rowwise() |>
+      # dplyr::mutate(survival = list(rnorm(NPERM,mean = survival, sd = sd))) |>
+      # tidyr::unnest(survival) |>
+      # dplyr::mutate(resident = runif(length(survival)))
       dplyr::mutate(cmax_sds = cmax_se.fit/r_sq) |>
       dplyr::mutate(WW = list(round(rnorm(NPERM,  fit, fit_sd),2))) |> #Round to 2 to match
       tidyr::unnest(WW) |>
@@ -113,45 +123,40 @@ TCHNconsmatVA = lapply(unique(LWdataA$cap_wy), function(y) {
     TCHN_cons_plt1 <- rnorm(NPERM * n, rep(LWdata_f$cmax_mean, NPERM), rep(LWdata_f$cmax_sds, NPERM)) / 
       rnorm(NPERM * n, LWdata_f$ref_cmax_mean[1], LWdata_f$ref_cmax_sds[1]) * # constant - only need one
       rnorm(NPERM * n, rep(LWdata_f$cmaxi_mean, NPERM), rep(LWdata_f$cmaxi_sds, NPERM)) * 
-      rep(LWdata_f$WW, NPERM) * pvals[rep(LWdata_f$age, NPERM)] * #pva; based on age
-      sample(dietfVCHN, NPERM * NPERM, replace = TRUE)
+      rep(LWdata_f$WW, NPERM) * pvals[rep(LWdata_f$age, NPERM)] * #pval based on age
+      sample(dietfVCHN, NPERM * n, replace = TRUE)
     TCHN_cons_p1 <- rnorm(NPERM * n, rep(LWdata_f$cmax_mean, NPERM), rep(LWdata_f$cmax_sds, NPERM)) / 
       rnorm(NPERM * n, LWdata_f$ref_cmax_mean[1],LWdata_f$ref_cmax_sds[1]) * 
       rnorm(NPERM * n, rep(LWdata_f$cmaxi_mean, NPERM), rep(LWdata_f$cmaxi_sds, NPERM)) * 
       rep(LWdata_f$WW, NPERM) * #1 * #pval == 1
-      sample(dietfVCHN, NPERM * NPERM, replace = TRUE)
+      sample(dietfVCHN, NPERM * n, replace = TRUE)
     
-    LWdata_f <- dplyr::bind_cols(LWdata_f[rep(seq(nrow(LWdata_f)), NPERM),],
+    LWdata_f <- dplyr::bind_cols(LWdata_f[rep(seq(nrow(LWdata_f)), each = NPERM),],
                                 "TCHN_cons_p1" = TCHN_cons_p1,
                                 "TCHN_cons_plt1" = TCHN_cons_plt1)
 
-    ## ifelse() is inefficient
     #If the predicted value is below 0, fix to 0
     LWdata_f$TCHN_cons_plt1[LWdata_f$TCHN_cons_plt1 < 0] <- 0
     LWdata_f$TCHN_cons_p1[LWdata_f$TCHN_cons_p1 < 0] <- 0
-
-    # if the date is <= date of capture, set consumption to 0 as well
-    # Since we remove the NA values later in the calc, we can do this as a one-op
-    LWdata_f <- LWdata_f |> dplyr::filter(!(Date <= cap_date_ymd) & !is.na(TCHN_cons_p1))
-
+    
     # Lots of time here
     # Continue
     LWdata_f <- LWdata_f |>
       dplyr::ungroup() |>
       #Summarise by finding the mean, upper, and lower consumption values for each date for each fish
-      dplyr::group_by(X, species, survey, gear, cap_wy, cap_date, fork_length_mm, age, Date) |>
+      dplyr::group_by(X, species, survey, gear, cap_wy, cap_date, fork_length_mm, age, exit_timing, Date) |>
       dplyr::summarize(plt1_mean = mean(TCHN_cons_plt1, na.rm = TRUE),
                        plt1_lwr = quantile(TCHN_cons_plt1, 0.025, na.rm = TRUE),
                        plt1_upr = quantile(TCHN_cons_plt1, 0.975, na.rm = TRUE),
                        p1_mean = mean(TCHN_cons_p1, na.rm = TRUE),
                        p1_lwr = quantile(TCHN_cons_p1, 0.025, na.rm = TRUE),
                        p1_upr = quantile(TCHN_cons_p1, 0.975, na.rm = TRUE))
-    
+
     LWdata_f
   }
 #  }, mc.cores = detectCores() - 4L )
   
-  bind_rows(fish_list)
+  data.table::rbindlist(fish_list)
 })
 
 stopCluster(cl = cl)
