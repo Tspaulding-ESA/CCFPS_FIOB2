@@ -9,7 +9,7 @@ TCHNconsmatVA <- readRDS(file.path("01_Data","Output","Tables","TCHNconsmatVA.rd
 
 TCHNconsmatVA %>%
   ungroup() %>%
-  group_by(cap_wy) %>%
+  group_by(cap_wy, outlier) %>%
   summarise(total_plt1_mean = sum(plt1_mean),
             total_plt1_lwr = sum(plt1_lwr),
             total_plt1_upr = sum(plt1_upr),
@@ -21,11 +21,14 @@ TCHNconsmatVA %>%
               fill = "blue", alpha = 0.1)+
   geom_line(aes(x = cap_wy, y = total_plt1_mean),
             color = "blue")+
+  facet_grid(rows = vars(outlier), scales = "free_y")+
+  labs(x = "Capture Year",
+       y = "Saved Chinook Biomass (g)")+
   theme_classic()
 
 TCHNconsmatVA %>%
   ungroup() %>%
-  group_by(age) %>%
+  group_by(age, outlier) %>%
   summarise(total_plt1_mean = sum(plt1_mean),
             total_plt1_lwr = sum(plt1_lwr),
             total_plt1_upr = sum(plt1_upr),
@@ -37,6 +40,7 @@ TCHNconsmatVA %>%
               fill = "blue", alpha = 0.1)+
   geom_line(aes(x = age, y = total_plt1_mean),
             color = "blue")+
+  facet_grid(rows = vars(outlier), scales = "free_y")+
   labs(x = "Estimated Age",
        y = "Saved Chinook Biomass (g)")+
   theme_classic()
@@ -63,19 +67,10 @@ TCHNconsmatVA %>%
 
 TCHNconsmatVA %>%
   ungroup() %>%
-  group_by(fork_bin = floor(fork_length_mm/10)*10) %>%
-  summarise(total_plt1_mean = sum(plt1_mean),
-            total_plt1_lwr = sum(plt1_lwr),
-            total_plt1_upr = sum(plt1_upr),
-            total_p1_mean = sum(p1_mean),
-            total_p1_lwr = sum(p1_lwr),
-            total_p1_upr = sum(p1_upr)) %>%
+  group_by(month = month(cap_date)) %>%
   ggplot()+
-  geom_ribbon(aes(x = fork_bin, ymin = total_plt1_lwr, ymax = total_plt1_upr),
-              fill = "blue", alpha = 0.1
-  )+
-  geom_line(aes(x = fork_bin, y = total_plt1_mean),
-             color = "blue")+
+  geom_histogram(aes(x = fork_length_mm), binwidth = 10)+
+  facet_grid(rows = vars(month))+
   labs(x = "Fork Length (mm)",
        y = "Saved Chinook Biomass (g)")+
   theme_classic()
