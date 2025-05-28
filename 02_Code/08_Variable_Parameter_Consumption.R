@@ -21,7 +21,7 @@ library(doSNOW)
 library(progress)
 set.seed(123)
 
-NPERM <- 10
+NPERM <- 100
 
 # Bring in the Data
 LWdataA <- readRDS(file.path("01_Data","Output","LWdataA.rds"))
@@ -144,7 +144,7 @@ TCHNconsmatVA = lapply(unique(LWdataA$cap_wy), function(y) {
     LWdata_f <- LWdata_f |>
       dplyr::ungroup() |>
       #Summarise by finding the mean, upper, and lower consumption values for each date for each fish
-      dplyr::group_by(X, species, survey, gear, cap_wy, cap_date, fork_length_mm, age, exit_timing, Date) |>
+      dplyr::group_by(X, species, survey, gear, cap_wy, cap_date, fork_length_mm, age, exit_timing, outlier, Date) |>
       dplyr::summarize(plt1_mean = mean(TCHN_cons_plt1, na.rm = TRUE),
                        plt1_lwr = quantile(TCHN_cons_plt1, 0.025, na.rm = TRUE),
                        plt1_upr = quantile(TCHN_cons_plt1, 0.975, na.rm = TRUE),
