@@ -41,7 +41,7 @@ LW_nls <- nls(weight_g ~ a * fork_length_mm^b,
                            b = 2.85))
 
 # Then, bootstrap and simulate the data to create a prediction interval
-pred_wt_bt <- nlraa::boot_nls(LW_nls, fitted) ## This takes about 7s
+pred_wt_bt <- nlraa::boot_nls(LW_nls, fitted) ## This takes awhile
 pred_wt_bt_pred <- nlraa::summary_simulate(t(pred_wt_bt$t))
 
 pred_wt <- data.frame(method = "nls-bootstrap", 
@@ -56,17 +56,24 @@ LWdataA <- LWdataA %>%
 
 # Plot
 ggplot()+
-  geom_point(data = LWdata, aes(x = fork_length_mm, y = weight_g),
-             shape = 21, fill = NA, color = "grey20")+
-  geom_line(data = pred_log, aes(x = fork_length_mm, y =exp(fit)),
-            color = "blue")+
-  geom_ribbon(data = pred_log, aes(x = fork_length_mm, ymin = exp(lwr), ymax = exp(upr)),
-              fill = "blue",alpha = 0.05)+
+  geom_point(data = LWdata, aes(x = fork_length_mm, y = weight_g, 
+                                color = outlier),
+             shape = 21, fill = NA)+
+  # geom_line(data = pred_log, aes(x = fork_length_mm, y =exp(fit)),
+  #           color = "blue")+
+  # geom_ribbon(data = pred_log, aes(x = fork_length_mm, ymin = exp(lwr), ymax = exp(upr)),
+  #             fill = "blue",alpha = 0.05)+
+  scale_color_manual(breaks = c(FALSE,TRUE),
+                     values = c("grey50","tomato"))+
   geom_line(data = pred_wt, aes(x = fork_length_mm, y = fit),
             color = "tomato")+
   geom_ribbon(data = pred_wt, aes(x = fork_length_mm, ymin = lwr, ymax = upr),
               fill = "tomato",alpha = 0.1, inherit.aes = FALSE)+
-  theme_classic()
+  theme_classic()+
+  theme(
+    legend.position = "none"
+  )+
+  labs(x = "Forklength (mm)", y = "Weight (g)")
 
 
 # determine the age class of each individual sampled
