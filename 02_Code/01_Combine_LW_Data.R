@@ -17,8 +17,8 @@ names(pres_2016) <- c("date","species","fork_length_mm","weight_lbs","mort","com
 
 pres_2016 <- pres_2016 %>%
   filter(species == "STB") %>%
-  mutate(weight_lbs = ifelse(fork_length_mm == 89 & weight_lbs == 0.2, 0.02, weight_lbs),
-         weight_lbs = ifelse(fork_length_mm == 388 & weight_lbs == 0.15, 1.5, weight_lbs)) %>%
+  # mutate(weight_lbs = ifelse(fork_length_mm == 89 & weight_lbs == 0.2, 0.02, weight_lbs),
+  #        weight_lbs = ifelse(fork_length_mm == 388 & weight_lbs == 0.15, 1.5, weight_lbs)) %>%
   select(date, species, fork_length_mm, weight_lbs)
 
 pres_2017 <-  read_xlsx(file.path(data_path, "PRES_catch_data_all_years.xlsx"),
@@ -63,16 +63,16 @@ pfrs <- pfrs %>%
   mutate(species = "STB",
          survey = "PFRS",
          gear = ifelse(gear == "lampara", "Lampara", gear),
-         weight_kg = ifelse(fork_length_mm == 122 & weight_kg == 0.35, 0.035, weight_kg),
-         weight_kg = ifelse(fork_length_mm == 525 & weight_kg == 0.26, 2.6, weight_kg),
-         weight_kg = ifelse(fork_length_mm == 225 & weight_kg == 0.9, 0.09, weight_kg),
-         weight_kg = ifelse(fork_length_mm == 215 & weight_kg == 0.75, 0.075, weight_kg),
-         fork_length_mm = ifelse(fork_length_mm == 34 & weight_kg == 0.48, 340, fork_length_mm),
-         fork_length_mm = ifelse(fork_length_mm == 305 & weight_kg == 0.06, 205, fork_length_mm),
-         fork_length_mm = ifelse(fork_length_mm == 368 & weight_kg == 0.12, 268, fork_length_mm),
-         fork_length_mm = ifelse(fork_length_mm == 149 & weight_kg == 0.18, 249, fork_length_mm),
-         fork_length_mm = ifelse(fork_length_mm == 138 & weight_kg == 0.13, 238, fork_length_mm),
-         fork_length_mm = ifelse(fork_length_mm == 255 & weight_kg == 0.05, 155, fork_length_mm)
+         # weight_kg = ifelse(fork_length_mm == 122 & weight_kg == 0.35, 0.035, weight_kg),
+         # weight_kg = ifelse(fork_length_mm == 525 & weight_kg == 0.26, 2.6, weight_kg),
+         # weight_kg = ifelse(fork_length_mm == 225 & weight_kg == 0.9, 0.09, weight_kg),
+         # weight_kg = ifelse(fork_length_mm == 215 & weight_kg == 0.75, 0.075, weight_kg),
+         # fork_length_mm = ifelse(fork_length_mm == 34 & weight_kg == 0.48, 340, fork_length_mm),
+         # fork_length_mm = ifelse(fork_length_mm == 305 & weight_kg == 0.06, 205, fork_length_mm),
+         # fork_length_mm = ifelse(fork_length_mm == 368 & weight_kg == 0.12, 268, fork_length_mm),
+         # fork_length_mm = ifelse(fork_length_mm == 149 & weight_kg == 0.18, 249, fork_length_mm),
+         # fork_length_mm = ifelse(fork_length_mm == 138 & weight_kg == 0.13, 238, fork_length_mm),
+         # fork_length_mm = ifelse(fork_length_mm == 255 & weight_kg == 0.05, 155, fork_length_mm)
          ) %>%
   select(survey, date, gear, species, fork_length_mm, weight_kg)
 
@@ -109,52 +109,8 @@ ggplot(data = catch_comb, aes(x = log(fork_length_mm), y = log(weight_kg))) +
 catch_comb_lw = filter(catch_comb, !is.na(fork_length_mm) & !is.na(weight_kg))
 
 # robust regression to reduce influence of outliers
-rr_mod = MASS::rlm(log(weight_kg) ~ log(fork_length_mm), data = catch_comb_lw)
-
-catch_comb_lw = mutate(catch_comb_lw, weight_kg_pred = pred_weight(rr_mod, fork_length_mm))
-
-ggplot(data = catch_comb_lw, aes(x = fork_length_mm)) +
-  geom_point(aes(y = weight_kg), size = 2, alpha = 0.2) +
-  geom_line(aes(y = weight_kg_pred))+
-  scale_x_continuous(breaks = seq(0,1300,50))+
-  scale_y_continuous(breaks = seq(0,20,1))
-
-# 0.25 weight cutoff comes from Kimmerer et al. 2005
-catch_comb_lw_out = catch_comb_lw %>% 
-  filter(rr_mod$w < 0.25) %>% 
-  mutate(diff = weight_kg_pred - weight_kg,
-         prop_diff = diff/weight_kg)
-
-p = ggplot(data = catch_comb_lw_out, 
-           aes(x = fork_length_mm, y = weight_kg, col = prop_diff,
-               text = paste("fl:", fork_length_mm, 
-                            "\nwt:", weight_kg,
-                            "\nwt_pred:", weight_kg_pred))) +
-  geom_point() +
-  scale_x_continuous(breaks = seq(0,1300,50))+
-  scale_color_continuous(type = "viridis")
-
-plotly::ggplotly(p)
-
-# compare lengths that were used in length-weight (which does not include outliers)
-# to fork lengths with no weight measurement
-catch_comb_comp = catch_comb %>% 
-  mutate(in_lw = !is.na(fork_length_mm) & !is.na(weight_kg))
-
-# nothing jumping out at me that seems like it needs closer inspection
-ggplot(catch_comb_comp, aes(x = gear, y = fork_length_mm, fill = in_lw)) +
-  geom_boxplot(alpha = 0.4)+
-  scale_fill_discrete(name = "Has Weight",
-                      breaks = c(FALSE, TRUE),
-                      labels = c("No","Yes"))
-
-write.csv(catch_comb, file.path("01_Data","Input","SBlw.csv"))
-
-
-# below this point I was exploring the idea that the shorter fork lengths were driving
-# the poor for longer fork lengths (based on log-log model)
-# not worth pursuing further but retaining here for FYI
-fl_thresh = 482
+# different relationship fits best for short and long fish
+fl_thresh = 400
 
 rr_mod_short = MASS::rlm(log(weight_kg) ~ log(fork_length_mm),
                          data = filter(catch_comb_lw, fork_length_mm < fl_thresh))
@@ -162,13 +118,75 @@ rr_mod_short = MASS::rlm(log(weight_kg) ~ log(fork_length_mm),
 rr_mod_long = MASS::rlm(log(weight_kg) ~ log(fork_length_mm),
                         data = filter(catch_comb_lw, fork_length_mm >= fl_thresh))
 
-catch_comb_lw = catch_comb_lw %>%
-  mutate(weight_kg_pred_short = pred_weight(rr_mod_short, fork_length_mm),
-         weight_kg_pred_long = pred_weight(rr_mod_long, fork_length_mm))
+catch_comb_lw_resid <- catch_comb_lw %>%
+  filter(fork_length_mm < fl_thresh) %>%
+  mutate(residual = rr_mod_short$w) %>%
+  bind_rows(filter(catch_comb_lw, fork_length_mm >= fl_thresh) %>%
+              mutate(residual = rr_mod_long$w)) %>%
+  mutate(outlier = residual < 0.25)
 
-# different relationship fits best for short and long fish
-# maybe obvious (statistical) reason for this?
-ggplot(data = catch_comb_lw, aes(x = fork_length_mm)) +
-  geom_point(aes(y = weight_kg), size = 2, alpha = 0.1) +
-  geom_line(aes(y = weight_kg_pred_short), col = "red", linewidth = 1) +
-  geom_line(aes(y = weight_kg_pred_long), col = "blue", linewidth = 1)
+# 0.25 weight cutoff comes from Kimmerer et al. 2005
+catch_comb_lw_resid = catch_comb_lw_resid %>%
+  mutate(weight_kg_pred = case_when(
+    fork_length_mm < fl_thresh ~ pred_weight(rr_mod_short, fork_length_mm),
+    fork_length_mm >= fl_thresh ~ pred_weight(rr_mod_long, fork_length_mm)
+  )) %>%
+  mutate(diff = weight_kg_pred - weight_kg,
+         prop_diff = diff/weight_kg) %>%
+  arrange(outlier)
+
+max_outlier <- max(catch_comb_lw_resid$fork_length_mm[catch_comb_lw_resid$outlier == TRUE])
+
+(full_plot <- ggplot(data = catch_comb_lw_resid, aes(x = fork_length_mm)) +
+  geom_point(aes(y = weight_kg, color = outlier, size = outlier), alpha = 0.5) +
+  geom_line(aes(y = weight_kg_pred), color = "blue")+
+  scale_size_manual(breaks = c(FALSE,TRUE),
+                    values = c(1.5,2))+
+  scale_color_manual(breaks = c(FALSE,TRUE),
+                       values = c("grey50","tomato"))+
+  scale_x_continuous(breaks = seq(0,1300,100))+
+  scale_y_continuous(breaks = seq(0,25,2))+
+  theme_classic()+
+  theme(
+    legend.position = "none",
+    axis.text.x = element_text(angle = -45, hjust = 0)
+  )+
+    labs(x = "Fork Length (mm)", y = "Weight (kg)"))
+
+(inset_plot <- ggplot(data = catch_comb_lw_resid %>% filter(fork_length_mm <= max_outlier), 
+                     aes(x = fork_length_mm)) +
+  geom_point(aes(y = weight_kg, color = outlier), size = 2, alpha = 0.5) +
+  geom_line(aes(y = weight_kg_pred), color = "blue")+
+  scale_color_manual(breaks = c(FALSE,TRUE),
+                     values = c("grey50","tomato"))+
+  scale_x_continuous(breaks = seq(0,1300,100))+
+  scale_y_continuous(breaks = seq(0,3,1))+
+  theme_classic()+
+  theme(
+    legend.position = "none"
+  )+
+    labs(x = "Fork Length (mm)", y = "Weight (kg)"))
+
+(lw_plot <- full_plot+
+  annotation_custom(
+    ggplotGrob(inset_plot),
+    xmin = 0, xmax = 750,
+    ymin = 9, ymax = 25
+  )+
+  annotate("rect", xmin = 25, ymin = -1, xmax = max_outlier, ymax = 4,
+           color = "grey30", fill = NA, linewidth = 0.75, alpha = 0.5)+
+  annotate("rect", xmin = 0, ymin = 9, xmax = 775, ymax = 25,
+           color = "grey30", fill = NA, linewidth = 0.75, alpha = 0.5)+
+  annotate("segment", x = 25, y = 4, xend = 0, yend = 9,
+           color = "grey50", linewidth = 0.5, alpha = 0.5)+
+  annotate("segment", x = max_outlier, y = 4, xend = 775, yend = 9,
+           color = "grey50", linewidth = 0.5, alpha = 0.5))
+
+ggsave(file.path("01_Data","Output","Figures","LW_outliers.png"), plot = lw_plot,
+       height = 4, width = 4, units = "in", dpi = 300)
+
+catch_comb <- catch_comb %>%
+  left_join(select(catch_comb_lw_resid, date:weight_kg, outlier)) %>%
+  replace_na(list("outlier" = FALSE))
+
+write.csv(catch_comb, file.path("01_Data","Input","SBlw.csv"))
