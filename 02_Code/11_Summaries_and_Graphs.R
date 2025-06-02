@@ -72,3 +72,29 @@ TCHNconsmatVA %>%
   labs(x = "Gear Type",
        y = "Saved Chinook Biomass (g) / Hour of Labor")+
   theme_classic()
+
+TCHNconsmatVA %>%
+  ungroup() %>%
+  filter(exit_timing == "median") %>%
+  group_by(month = month(cap_date),
+           cap_wy) %>%
+  summarise(effort_plt1_mean = sum(effort_plt1_mean),
+            effort_plt1_lwr = sum(effort_plt1_lwr),
+            effort_plt1_upr = sum(effort_plt1_upr),
+            effort_p1_mean = sum(effort_p1_mean),
+            effort_p1_lwr = sum(effort_p1_lwr),
+            effort_p1_upr = sum(effort_p1_upr)) %>%
+  mutate(month = ifelse(month > 9, month - 9, month + 3)) %>%
+  ggplot()+
+  geom_ribbon(aes(x = month, ymin = effort_plt1_lwr, ymax = effort_plt1_upr),
+              fill = "blue", alpha = 0.1)+
+  geom_line(aes(x = month, y = effort_plt1_mean),
+            color = "blue")+
+  scale_y_continuous(breaks = scales::pretty_breaks(n = 5),
+                     labels = scales::label_comma())+
+  scale_x_continuous(breaks = c(1:9),
+                     labels = month.abb[c(10:12,1:6)])+
+  facet_grid(rows = vars(cap_wy), scales = "free_y")+
+  labs(x = "Capture Month",
+       y = "Saved Chinook Biomass (g) / Hour of Labor")+
+  theme_classic()
