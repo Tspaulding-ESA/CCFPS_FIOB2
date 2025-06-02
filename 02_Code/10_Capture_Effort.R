@@ -36,6 +36,7 @@ effort_2 <- effort %>%
       method == "transport" ~ "Transport"
     )
     ) %>%
+  filter(!is.na(date)) %>%
   rowwise() %>%
   mutate(crew = str_replace_all(crew,", ,",",")) %>%
   mutate(crew = str_replace_all(crew,", ",",")) %>%
@@ -54,7 +55,7 @@ effort_2 <- effort %>%
   mutate(crew_count = ifelse(is.na(crew_count),crew_length, crew_count))
 
 
-# Build LU for average activity hours
+# Build LU for average activity hours and crew count
 activity_hours <- effort_2 %>%
   group_by(gear) %>%
   summarise(avg_act_hrs = mean(activity_hours, na.rm = TRUE)) %>%
@@ -62,11 +63,52 @@ activity_hours <- effort_2 %>%
                               mean(avg_act_hrs, na.rm = TRUE),
                               avg_act_hrs))
 
+activity_crew <- effort_2 %>%
+  group_by(gear) %>%
+  summarise(avg_crew = round(mean(crew_count, na.rm = TRUE),0)) %>%
+  mutate(avg_crew = ifelse(is.na(avg_crew),
+                              round(mean(avg_crew, na.rm = TRUE),0),
+                              avg_crew))
+
+# Ensure that there is processing and transport for every day of collection
+missing <- effort_2 %>%
+  select(date, survey, gear, activity_hours) %>%
+  distinct() %>%
+  pivot_wider(names_from = "gear", values_from = "activity_hours", 
+              values_fn = function(x) mean(x, na.rm = TRUE)) %>%
+  select(date, survey, Processing, Transport) %>%
+  pivot_longer(Processing:Transport,
+               names_to = "gear", 
+               values_to = "activity_hours") %>%
+  filter(is.na(activity_hours)) %>%
+  left_join(activity_hours) %>%
+  left_join(activity_crew) %>%
+  mutate(activity_hours = ifelse(is.na(activity_hours),
+                                 avg_act_hrs,
+                                 activity_hours),
+         crew_count = avg_crew) %>%
+  select(date, survey, gear, activity_hours, crew_count)
+
+# Finally, weight processing and transport by the proportion of catch
+LWdataA <- readRDS(file.path("01_Data","Output","LWdataA.rds"))
+
+weights <- LWdata %>%
+  ungroup() %>%
+  mutate(date = ymd(date)) %>%
+  group_by(date, gear) %>%
+  tally(name = "catch") %>%
+  ungroup() %>%
+  group_by(date) %>%
+  mutate(weight = catch/sum(catch)) %>%
+  select(date, gear, weight)
+
 activity_effort <- effort_2 %>%
+  bind_rows(missing) %>%
   left_join(activity_hours) %>%
   mutate(activity_hours = ifelse(is.na(activity_hours),avg_act_hrs,activity_hours)) %>%
   mutate(labor_hours = activity_hours * crew_count) %>%
   group_by(date, gear) %>%
-  summarize(labor_hours = sum(labor_hours, na.rm = TRUE))
+  summarize(labor_hours = sum(labor_hours, na.rm = TRUE)) %>%
+  left_join(weights)
 
 saveRDS(activity_effort, file.path("01_Data","Input","effort.rds"))         
