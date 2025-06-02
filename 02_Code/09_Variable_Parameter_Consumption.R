@@ -21,7 +21,7 @@ library(doSNOW)
 library(progress)
 set.seed(123)
 
-NPERM <- 100
+NPERM <- 25
 
 # Bring in the Data
 LWdataA <- readRDS(file.path("01_Data","Output","LWdataA.rds"))
