@@ -92,7 +92,7 @@ missing <- effort_2 %>%
 # Finally, weight processing and transport by the proportion of catch
 LWdataA <- readRDS(file.path("01_Data","Output","LWdataA.rds"))
 
-weights <- LWdata %>%
+weights <- LWdataA %>%
   ungroup() %>%
   mutate(date = ymd(date)) %>%
   group_by(date, gear) %>%

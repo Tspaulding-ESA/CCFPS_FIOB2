@@ -19,8 +19,6 @@ em_probs <- bind_cols(df,probs) %>%
 
 saveRDS(em_probs,file.path("01_Data","Input","emigration_probs.rds"))
 
-library(survival)
-
 # Age ID
 age_label <- rep(c("1-2","1-2","3-5","3-5","3-5","6+","6+","6+","6+","6+"), 1000)
 
