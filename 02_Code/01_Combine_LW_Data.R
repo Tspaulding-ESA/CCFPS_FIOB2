@@ -77,24 +77,24 @@ pfrs <- pfrs %>%
     species == "LMB" ~ "LMB", #Largemouth Bass
     species == "SPB" ~ "SPB", #Spotted Bass
     species == "REB" ~ "REB", #Redeye Bass
-    species == "AS" ~ "", # (?)
+    species == "AS" ~ "AMS", #American Shad
     species == "SPT" ~ "SPT", #Splittail
-    species == "BKB" ~ "BKB", #Black Bass
+    species == "BKB" ~ "BKB", #Black Bullhead
     species == "WCF" ~ "WCF", #White Catfish
     species == "RSF" ~ "RSF", #Redear Sunfish
     species == "SH" ~ "STH", #Steelhead (?)
-    species == "TS" ~ "TSM", #Topsmelt (?)
+    species == "TS" ~ "THS", #Threadfin Shad
     species == "CP" ~ "CCP", #Common Carp (?),
     species == "GF" ~ "GF", #Goldfish (?),
     species == "spb" ~ "SPB", # Spotted Bass
     species == "CS" ~ "CHN", #Chinook Salmon
-    species == "STW" ~ "STW", # (?)
+    species == "STW" ~ "WST", # White Sturgeon
     species == "WMS" ~ "WMS", # Warmouth (?)
-    species == "SCP" ~ "SCP", # (?)
+    species == "SCP" ~ "SCP", # Sculpin
     species == "CF" ~ "CF", #Catfish,
     species == "SQ" ~ "SPM", #Sacramento Pikeminnow
     species == "TP" ~ "TP", #Tule Perch (?)
-    species == "GSH" ~ "GSH", #Green Sunfish (?)
+    species == "GSH" ~ "GSH", #Golden Shiner
     species == "BCF" ~ "BCF", #Blue Catfish (?)
   ),
   survey = "PFRS",
@@ -133,7 +133,7 @@ epfrrs = read.csv(file.path(data_path, "FishMeasurements.csv")) %>%
     COMMON_NAME == "white-catfish" ~ "WCF",
     COMMON_NAME == "blue-catfish" ~ "BCF",
     COMMON_NAME == "warmouth" ~ "WMS",
-    COMMON_NAME == "black-bullhead" ~ "BBH",
+    COMMON_NAME == "black-bullhead" ~ "BKB",
     COMMON_NAME == "splittail" ~ "SPT",
     COMMON_NAME == "white-crappie" ~ "WCR",
     COMMON_NAME == "green-sunfish" ~ "GSF"
