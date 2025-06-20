@@ -16,7 +16,7 @@ pres_2016 <- read_xlsx(file.path(data_path, "PRES_catch_data_all_years.xlsx"),
 names(pres_2016) <- c("date","species","fork_length_mm","weight_lbs","mort","comments")
 
 pres_2016 <- pres_2016 %>%
-  filter(species == "STB") %>%
+  #filter(species == "STB") %>%
   # mutate(weight_lbs = ifelse(fork_length_mm == 89 & weight_lbs == 0.2, 0.02, weight_lbs),
   #        weight_lbs = ifelse(fork_length_mm == 388 & weight_lbs == 0.15, 1.5, weight_lbs)) %>%
   select(date, species, fork_length_mm, weight_lbs)
@@ -28,8 +28,16 @@ names(pres_2017) <- c("date","month", "common_name","species_grp",
                       "fork_length_mm","total_length_mm","weight_lbs")
 
 pres_2017 <- pres_2017 %>%
-  filter(common_name == "Striped Bass") %>%
-  mutate(species = "STB") %>%
+  #filter(common_name == "Striped Bass") %>%
+  mutate(species = case_when(
+    common_name == "Striped Bass" ~ "STB",
+    common_name == "Black Bass" ~ "BLB",
+    common_name == "Largemouth Bass" ~ "LMB",
+    common_name == "White Catfish" ~ 'WCF',
+    common_name == "Spotted Bass" ~ 'SPB',
+    common_name == "Channel Catfish" ~ "CHC",
+    common_name == "Brown Bullhead" ~ "BBH"
+  )) %>%
   select(date, species, fork_length_mm, weight_lbs)
 
 pres_2018 <-  read_xlsx(file.path(data_path, "PRES_catch_data_all_years.xlsx"),
@@ -41,7 +49,7 @@ names(pres_2018) <- c("sample_id", "catch_id", "date","month", "boat_id",
                       "comments")
 
 pres_2018 <- pres_2018 %>%
-  filter(species == "STB") %>%
+  #filter(species == "STB") %>%
   select(date, species, fork_length_mm, weight_lbs)
 
 pres <- bind_rows(pres_2016, pres_2017, pres_2018) %>%
@@ -59,21 +67,49 @@ names(pfrs) <- c("date", "crew", "time","gear", "species",
                  "transport_id","start_trans", "end_trans","comments")
 
 pfrs <- pfrs %>%
-  filter(species == "SB") %>%
-  mutate(species = "STB",
-         survey = "PFRS",
-         gear = ifelse(gear == "lampara", "Lampara", gear),
-         # weight_kg = ifelse(fork_length_mm == 122 & weight_kg == 0.35, 0.035, weight_kg),
-         # weight_kg = ifelse(fork_length_mm == 525 & weight_kg == 0.26, 2.6, weight_kg),
-         # weight_kg = ifelse(fork_length_mm == 225 & weight_kg == 0.9, 0.09, weight_kg),
-         # weight_kg = ifelse(fork_length_mm == 215 & weight_kg == 0.75, 0.075, weight_kg),
-         # fork_length_mm = ifelse(fork_length_mm == 34 & weight_kg == 0.48, 340, fork_length_mm),
-         # fork_length_mm = ifelse(fork_length_mm == 305 & weight_kg == 0.06, 205, fork_length_mm),
-         # fork_length_mm = ifelse(fork_length_mm == 368 & weight_kg == 0.12, 268, fork_length_mm),
-         # fork_length_mm = ifelse(fork_length_mm == 149 & weight_kg == 0.18, 249, fork_length_mm),
-         # fork_length_mm = ifelse(fork_length_mm == 138 & weight_kg == 0.13, 238, fork_length_mm),
-         # fork_length_mm = ifelse(fork_length_mm == 255 & weight_kg == 0.05, 155, fork_length_mm)
-         ) %>%
+  #filter(species == "SB") %>%
+  mutate(species = case_when(
+    species == "SB" ~ "STB", #Striped Bass
+    species == "BCR" ~ "BCR", #Black Crappie
+    species == "BG" ~ "BGS", #Bluegill Sunfish
+    species == "BB" ~ "BBH", #Brownbullhead
+    species == "CC" ~ "CHC", #Channel Catfish
+    species == "LMB" ~ "LMB", #Largemouth Bass
+    species == "SPB" ~ "SPB", #Spotted Bass
+    species == "REB" ~ "REB", #Redeye Bass
+    species == "AS" ~ "", # (?)
+    species == "SPT" ~ "SPT", #Splittail
+    species == "BKB" ~ "BKB", #Black Bass
+    species == "WCF" ~ "WCF", #White Catfish
+    species == "RSF" ~ "RSF", #Redear Sunfish
+    species == "SH" ~ "STH", #Steelhead (?)
+    species == "TS" ~ "TSM", #Topsmelt (?)
+    species == "CP" ~ "CCP", #Common Carp (?),
+    species == "GF" ~ "GF", #Goldfish (?),
+    species == "spb" ~ "SPB", # Spotted Bass
+    species == "CS" ~ "CHN", #Chinook Salmon
+    species == "STW" ~ "STW", # (?)
+    species == "WMS" ~ "WMS", # Warmouth (?)
+    species == "SCP" ~ "SCP", # (?)
+    species == "CF" ~ "CF", #Catfish,
+    species == "SQ" ~ "SPM", #Sacramento Pikeminnow
+    species == "TP" ~ "TP", #Tule Perch (?)
+    species == "GSH" ~ "GSH", #Green Sunfish (?)
+    species == "BCF" ~ "BCF", #Blue Catfish (?)
+  ),
+  survey = "PFRS",
+  gear = ifelse(gear == "lampara", "Lampara", gear),
+  # weight_kg = ifelse(fork_length_mm == 122 & weight_kg == 0.35, 0.035, weight_kg),
+  # weight_kg = ifelse(fork_length_mm == 525 & weight_kg == 0.26, 2.6, weight_kg),
+  # weight_kg = ifelse(fork_length_mm == 225 & weight_kg == 0.9, 0.09, weight_kg),
+  # weight_kg = ifelse(fork_length_mm == 215 & weight_kg == 0.75, 0.075, weight_kg),
+  # fork_length_mm = ifelse(fork_length_mm == 34 & weight_kg == 0.48, 340, fork_length_mm),
+  # fork_length_mm = ifelse(fork_length_mm == 305 & weight_kg == 0.06, 205, fork_length_mm),
+  # fork_length_mm = ifelse(fork_length_mm == 368 & weight_kg == 0.12, 268, fork_length_mm),
+  # fork_length_mm = ifelse(fork_length_mm == 149 & weight_kg == 0.18, 249, fork_length_mm),
+  # fork_length_mm = ifelse(fork_length_mm == 138 & weight_kg == 0.13, 238, fork_length_mm),
+  # fork_length_mm = ifelse(fork_length_mm == 255 & weight_kg == 0.05, 155, fork_length_mm)
+  ) %>%
   select(survey, date, gear, species, fork_length_mm, weight_kg)
 
 # Grab the EPFRRS data and reformat
@@ -84,33 +120,53 @@ epfrrs_gear = lapply(list.files(data_path, "_Metadata", full.names = TRUE),
   distinct()
 
 epfrrs = read.csv(file.path(data_path, "FishMeasurements.csv")) %>%
-  filter(COMMON_NAME == "striped-bass") %>%
+  #filter(COMMON_NAME == "striped-bass") %>%
   left_join(epfrrs_gear) %>% 
-  mutate(species = "STB",
-         survey = "EPFRRS",
-         date = ymd(SAMPLING_DATETIME),
-         gear = case_when(is.na(gear) & hl_record_id != "" ~ "Hook-Line",
-                          gear == "boat-electrofishing" ~ "E-fishing",
-                          gear == "seining" ~ "Seine",
-                          gear == "hoop" ~ "Hoop",
-                          gear == "kodiak-trawl" ~ "Kodiak",
-                          .default = gear)) %>% 
+  mutate(species = case_when(
+    COMMON_NAME == "largemouth-bass" ~ "LMB",
+    COMMON_NAME == "redear" ~ "RSF",
+    COMMON_NAME == "striped-bass" ~ "STB",
+    COMMON_NAME == "black-crappie" ~ "BCP",
+    COMMON_NAME == "bluegill" ~ "BGS",
+    COMMON_NAME == "brown-bullhead" ~ "BBH",
+    COMMON_NAME == "channel-catfish" ~ "CHC",
+    COMMON_NAME == "white-catfish" ~ "WCF",
+    COMMON_NAME == "blue-catfish" ~ "BCF",
+    COMMON_NAME == "warmouth" ~ "WMS",
+    COMMON_NAME == "black-bullhead" ~ "BBH",
+    COMMON_NAME == "splittail" ~ "SPT",
+    COMMON_NAME == "white-crappie" ~ "WCR",
+    COMMON_NAME == "green-sunfish" ~ "GSF"
+  ),
+  survey = "EPFRRS",
+  date = ymd(SAMPLING_DATETIME),
+  gear = case_when(is.na(gear) & hl_record_id != "" ~ "Hook-Line",
+                   gear == "boat-electrofishing" ~ "E-fishing",
+                   gear == "seining" ~ "Seine",
+                   gear == "hoop" ~ "Hoop",
+                   gear == "kodiak-trawl" ~ "Kodiak",
+                   .default = gear)) %>% 
   select(survey, date, gear, species, fork_length_mm = FORK_LENGTH_MM)
 
 # Combine all
 
-catch_comb <- bind_rows(pres, pfrs, epfrrs) %>% 
-  filter(!(is.na(fork_length_mm) & is.na(weight_kg))) 
+catch_comb <- bind_rows(pres, pfrs, epfrrs)
+saveRDS(catch_comb, file.path("01_Data","Input","All_Fish_Catch.RDS"))
 
 ggplot(data = catch_comb, aes(x = log(fork_length_mm), y = log(weight_kg))) +
   geom_point(aes(color = survey), shape = 21) +
   facet_wrap(~gear)
 
 catch_comb_lw = filter(catch_comb, !is.na(fork_length_mm) & !is.na(weight_kg))
+saveRDS(catch_comb_lw, file.path("01_Data","Input","All_Fish_LW.RDS"))
 
 # robust regression to reduce influence of outliers
 # different relationship fits best for short and long fish
 fl_thresh = 400
+
+#Now filter for just STB for the LW regression
+catch_comb_lw <- catch_comb_lw %>%
+  filter(species == "STB")
 
 rr_mod_short = MASS::rlm(log(weight_kg) ~ log(fork_length_mm),
                          data = filter(catch_comb_lw, fork_length_mm < fl_thresh))
@@ -186,6 +242,7 @@ ggsave(file.path("01_Data","Output","Figures","LW_outliers.png"), plot = lw_plot
        height = 4, width = 4, units = "in", dpi = 300)
 
 catch_comb <- catch_comb %>%
+  filter(species == "STB") %>%
   left_join(select(catch_comb_lw_resid, date:weight_kg, outlier)) %>%
   replace_na(list("outlier" = FALSE))
 
