@@ -111,4 +111,18 @@ activity_effort <- effort_2 %>%
   summarize(labor_hours = sum(labor_hours, na.rm = TRUE)) %>%
   left_join(weights)
 
+activity_effort <- activity_effort %>%
+  filter(gear %in% c("Processing","Transport")) %>%
+  pivot_wider(names_from = gear, values_from = labor_hours) %>%
+  select(-weight) %>%
+  rename("proc_hours" = Processing,
+         "trans_hours" = Transport) %>%
+  left_join(activity_effort %>%
+               filter(!(gear %in% c("Processing","Transport")))) %>%
+  rename("gear_hours" = labor_hours) %>%
+  mutate(proc_hours = proc_hours*weight,
+         trans_hours = trans_hours*weight) %>%
+  dplyr::select(date, gear, gear_hours, proc_hours, trans_hours, weight)
+
 saveRDS(activity_effort, file.path("01_Data","Input","effort.rds"))         
+write.csv(activity_effort, file.path("activity_effort.csv"), row.names = FALSE)
