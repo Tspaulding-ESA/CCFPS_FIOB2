@@ -10,8 +10,7 @@ effort <- readRDS(file.path("01_Data","Input","effort.rds"))
 
 TCHNconsmatVA <- TCHNconsmatVA %>% 
   ungroup() %>%
-  filter(outlier == FALSE) %>%
-  group_by(cap_wy, survey, gear, exit_timing, cap_date) %>%
+  group_by(outlier, cap_wy, survey, gear, exit_timing, cap_date) %>%
   summarise(total_plt1_mean = sum(plt1_mean),
             total_plt1_lwr = sum(plt1_lwr),
             total_plt1_upr = sum(plt1_upr),
@@ -19,24 +18,17 @@ TCHNconsmatVA <- TCHNconsmatVA %>%
             total_p1_lwr = sum(p1_lwr),
             total_p1_upr = sum(p1_upr)) %>%
   left_join(effort, by = c("cap_date" = "date", "gear"))%>%
-  left_join(effort %>%
-              filter(gear %in% c("Transport","Processing")) %>%
-              rename("method" = gear,
-                     "activity_hours" = labor_hours) %>%
-              select(-weight), 
-                     by = c("cap_date" = "date")) %>%
-  pivot_wider(names_from = "method", values_from = "activity_hours") %>%
-  mutate(effort_plt1_mean = total_plt1_mean/(labor_hours + (Processing*weight) + (Transport*weight)),
-         effort_plt1_lwr = total_plt1_lwr/(labor_hours + (Processing*weight) + (Transport*weight)),
-         effort_plt1_upr = total_plt1_upr/(labor_hours  + (Processing*weight) + (Transport*weight)),
-         effort_p1_mean  = total_p1_mean/(labor_hours  + (Processing*weight) + (Transport*weight)),
-         effort_p1_lwr = total_p1_lwr/(labor_hours  + (Processing*weight) + (Transport*weight)),
-         effort_p1_upr = total_p1_upr/(labor_hours  + (Processing*weight) + (Transport*weight)))
+  mutate(effort_plt1_mean = total_plt1_mean/(gear_hours + proc_hours + trans_hours),
+         effort_plt1_lwr = total_plt1_lwr/(gear_hours + proc_hours + trans_hours),
+         effort_plt1_upr = total_plt1_upr/(gear_hours  + proc_hours + trans_hours),
+         effort_p1_mean  = total_p1_mean/(gear_hours  + proc_hours + trans_hours),
+         effort_p1_lwr = total_p1_lwr/(gear_hours  + proc_hours + trans_hours),
+         effort_p1_upr = total_p1_upr/(gear_hours  + proc_hours + trans_hours))
 
 TCHNconsmatVA %>%
   ungroup() %>%
   filter(exit_timing == "median") %>%
-  group_by(cap_wy) %>%
+  group_by(outlier, cap_wy) %>%
   summarise(effort_plt1_mean = sum(effort_plt1_mean),
             effort_plt1_lwr = sum(effort_plt1_lwr),
             effort_plt1_upr = sum(effort_plt1_upr),
@@ -50,6 +42,8 @@ TCHNconsmatVA %>%
             color = "blue")+
   scale_y_continuous(breaks = scales::pretty_breaks(n = 10),
                      labels = scales::label_comma())+
+  facet_grid(rows = vars(outlier)#, scales = "free_y"
+             )+
   labs(x = "Capture Year",
        y = "Saved Chinook Biomass (g) / Hour of Labor")+
   theme_classic()
